@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-white text-dark-900;
+    font-feature-settings: "rounding" 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  .container-wide {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .button-primary {
+    @apply px-6 py-3 bg-primary-600 text-white rounded-lg font-medium transition-all duration-200 hover:bg-primary-700 active:scale-95;
+  }
+
+  .button-secondary {
+    @apply px-6 py-3 border-2 border-primary-600 text-primary-600 rounded-lg font-medium transition-all duration-200 hover:bg-primary-50 active:scale-95;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-600 to-primary-700 bg-clip-text text-transparent;
+  }
+}
