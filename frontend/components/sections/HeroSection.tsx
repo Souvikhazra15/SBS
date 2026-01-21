@@ -1,9 +1,10 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { Button } from '@/components/Button'
 import { useScrollAnimation } from '@/hooks/useScrollAnimation'
 import { useRouter } from 'next/navigation'
+import { AuthModal } from '@/components/AuthModal'
 
 function AbstractIllustration() {
   return (
@@ -72,6 +73,13 @@ function AbstractIllustration() {
 export function HeroSection() {
   const { ref, isVisible } = useScrollAnimation()
   const router = useRouter()
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [user, setUser] = useState<any>(null)
+
+  const handleAuthSuccess = (userData: any) => {
+    setUser(userData)
+    setIsAuthModalOpen(false)
+  }
 
   return (
     <section
@@ -106,38 +114,29 @@ export function HeroSection() {
   Enterprise-grade identity verification platform with AI-powered document OCR, real-time fraud detection, and global AML compliance. Reduce onboarding friction while maintaining security.
 </p>
 
-{/* CTA Buttons */}
-<div className="flex flex-col sm:flex-row gap-4 mb-10">
-  <Button
-    variant="primary"
-    size="lg"
-    className="w-full sm:w-auto text-center"
-    onClick={() => setIsAuthModalOpen(true)}
-  >
-    {user ? 'Start Verification' : 'Start Demo'}
-  </Button>
-  <Button
-    variant="outline"
-    size="lg"
-                onClick={() => {
-                  const demoSection = document.getElementById('demo')
-                  demoSection?.scrollIntoView({ behavior: 'smooth' })
-                }}
-              >
-                Start Demo
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                className="w-full sm:w-auto text-center"
-                onClick={() => {
-                  const contactSection = document.getElementById('contact')
-                  contactSection?.scrollIntoView({ behavior: 'smooth' })
-                }}
-              >
-                Contact Sales
-              </Button>
-            </div>
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-10">
+            <Button
+              variant="primary"
+              size="lg"
+              className="w-full sm:w-auto text-center"
+              onClick={() => setIsAuthModalOpen(true)}
+            >
+              {user ? 'Start Verification' : 'Start Demo'}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full sm:w-auto text-center"
+              onClick={() => {
+                const contactSection = document.getElementById('contact')
+                contactSection?.scrollIntoView({ behavior: 'smooth' })
+              }}
+            >
+              Contact Sales
+            </Button>
+          </div>
 
             {/* Trust indicators */}
             <div className="flex flex-wrap gap-6 text-sm text-dark-600 dark:text-dark-400">
@@ -162,6 +161,9 @@ export function HeroSection() {
           </div>
         </div>
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} onSuccess={handleAuthSuccess} />
     </section>
   )
 }
