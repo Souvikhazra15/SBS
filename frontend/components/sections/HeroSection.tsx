@@ -3,6 +3,7 @@
 import React from 'react'
 import { Button } from '@/components/Button'
 import { useScrollAnimation } from '@/hooks/useScrollAnimation'
+import { useRouter } from 'next/navigation'
 
 function AbstractIllustration() {
   return (
@@ -70,6 +71,7 @@ function AbstractIllustration() {
 
 export function HeroSection() {
   const { ref, isVisible } = useScrollAnimation()
+  const router = useRouter()
 
   return (
     <section
@@ -99,17 +101,24 @@ export function HeroSection() {
               <span className="block bg-gradient-to-r from-primary-600 to-primary-700 dark:from-primary-400 dark:to-primary-500 bg-clip-text text-transparent">in Seconds</span>
             </h1>
 
-            {/* Subtext */}
-            <p className="text-lg sm:text-xl text-dark-600 dark:text-dark-400 mb-8 leading-relaxed max-w-lg">
-              Enterprise-grade identity verification platform with AI-powered document OCR, real-time fraud detection, and global AML compliance. Reduce onboarding friction while maintaining security.
-            </p>
+{/* Subtext */}
+<p className="text-lg sm:text-xl text-dark-600 dark:text-dark-400 mb-8 leading-relaxed max-w-lg">
+  Enterprise-grade identity verification platform with AI-powered document OCR, real-time fraud detection, and global AML compliance. Reduce onboarding friction while maintaining security.
+</p>
 
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-8">
-              <Button
-                variant="primary"
-                size="lg"
-                className="w-full sm:w-auto text-center"
+{/* CTA Buttons */}
+<div className="flex flex-col sm:flex-row gap-4 mb-10">
+  <Button
+    variant="primary"
+    size="lg"
+    className="w-full sm:w-auto text-center"
+    onClick={() => setIsAuthModalOpen(true)}
+  >
+    {user ? 'Start Verification' : 'Start Demo'}
+  </Button>
+  <Button
+    variant="outline"
+    size="lg"
                 onClick={() => {
                   const demoSection = document.getElementById('demo')
                   demoSection?.scrollIntoView({ behavior: 'smooth' })
