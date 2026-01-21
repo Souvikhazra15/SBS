@@ -18,6 +18,14 @@
 # misc
 .DS_Store
 *.pem
+Thumbs.db
+
+# videos temp
+public/videos/**.tmp
+
+# Cache
+.cache/
+node_modules/.cache
 
 # debug
 npm-debug.log*

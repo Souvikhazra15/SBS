@@ -393,7 +393,7 @@ export function FeaturesSection() {
                           <a
                             key={i}
                             href={`#${section.toLowerCase().replace(/\s+/g, '-')}`}
-                            className="block px-2 sm:px-3 py-2 rounded-md bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-800/30 text-primary-700 dark:text-primary-400 font-medium text-xs sm:text-sm transition-colors duration-200 flex items-center gap-2"
+                            className="bliock px-2 sm:px-3 py-2 rounded-md bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-800/30 text-primary-700 dark:text-primary-400 font-medium text-xs sm:text-sm transition-colors duration-200 items-center gap-2"
                           >
                             <span className="text-primary-500 dark:text-primary-400">•</span>
                             {section}

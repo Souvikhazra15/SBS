@@ -11,7 +11,7 @@ export function CTASection() {
     <section
       ref={ref}
       id="demo"
-      className={`py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-primary-600 to-primary-700 text-white ${
+      className={`py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-primary-600 to-primary-700 dark:from-primary-500 dark:to-primary-600 text-white transition-all ${
         isVisible ? 'animate-fade-in' : 'opacity-0'
       }`}
     >
@@ -26,14 +26,14 @@ export function CTASection() {
           <Button
             variant="primary"
             size="lg"
-            className="bg-white text-primary-600 hover:bg-primary-50 w-full sm:w-auto"
+            className="bg-white dark:bg-dark-900 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-dark-800 w-full sm:w-auto shadow-lg"
           >
             Start Free Trial
           </Button>
           <Button
             variant="outline"
             size="lg"
-            className="border-white text-white hover:bg-white/10 w-full sm:w-auto"
+            className="border-2 border-white dark:border-dark-100 text-white hover:bg-white/10 dark:hover:bg-dark-900/30 w-full sm:w-auto"
             onClick={() => {
               const contactSection = document.getElementById('contact')
               contactSection?.scrollIntoView({ behavior: 'smooth' })

@@ -40,14 +40,14 @@ export function TestimonialsSection() {
   const { ref, isVisible } = useScrollAnimation()
 
   return (
-    <section ref={ref} className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
+    <section ref={ref} className="py-20 px-4 sm:px-6 lg:px-8 bg-white dark:bg-dark-900 transition-colors">
       <div className="container-wide">
         {/* Header */}
         <div className={`text-center mb-16 ${isVisible ? 'animate-slide-up' : ''}`}>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-dark-900 mb-4">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-dark-900 dark:text-dark-50 mb-4">
             Trusted by Industry Leaders
           </h2>
-          <p className="text-lg text-dark-500 max-w-2xl mx-auto">
+          <p className="text-lg text-dark-500 dark:text-dark-400 max-w-2xl mx-auto">
             See what companies are saying about their experience with VerifyAI.
           </p>
         </div>
@@ -72,14 +72,14 @@ export function TestimonialsSection() {
               </div>
 
               {/* Quote */}
-              <p className="text-dark-700 mb-6 flex-grow leading-relaxed">
+              <p className="text-dark-700 dark:text-dark-300 mb-6 flex-grow leading-relaxed">
                 "{testimonial.content}"
               </p>
 
               {/* Author info */}
               <div>
-                <p className="font-semibold text-dark-900">{testimonial.author}</p>
-                <p className="text-sm text-dark-600">
+                <p className="font-semibold text-dark-900 dark:text-dark-50">{testimonial.author}</p>
+                <p className="text-sm text-dark-600 dark:text-dark-400">
                   {testimonial.title} · {testimonial.company}
                 </p>
               </div>
@@ -91,16 +91,16 @@ export function TestimonialsSection() {
         {/* Stats */}
         <div className={`mt-16 grid md:grid-cols-3 gap-8 text-center ${isVisible ? 'animate-fade-in' : 'opacity-0'}`}>
           <div>
-            <p className="text-4xl font-bold text-primary-600 mb-2">500+</p>
-            <p className="text-dark-600">Active Customers</p>
+            <p className="text-4xl font-bold text-primary-600 dark:text-primary-400 mb-2">500+</p>
+            <p className="text-dark-600 dark:text-dark-400">Active Customers</p>
           </div>
           <div>
-            <p className="text-4xl font-bold text-primary-600 mb-2">50M+</p>
-            <p className="text-dark-600">Verifications Processed</p>
+            <p className="text-4xl font-bold text-primary-600 dark:text-primary-400 mb-2">50M+</p>
+            <p className="text-dark-600 dark:text-dark-400">Verifications Processed</p>
           </div>
           <div>
-            <p className="text-4xl font-bold text-primary-600 mb-2">150+</p>
-            <p className="text-dark-600">Countries Supported</p>
+            <p className="text-4xl font-bold text-primary-600 dark:text-primary-400 mb-2">150+</p>
+            <p className="text-dark-600 dark:text-dark-400">Countries Supported</p>
           </div>
         </div>
       </div>

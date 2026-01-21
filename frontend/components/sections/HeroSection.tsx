@@ -6,59 +6,65 @@ import { useScrollAnimation } from '@/hooks/useScrollAnimation'
 
 function AbstractIllustration() {
   return (
-    <svg
-      className="w-full h-full max-w-md mx-auto animate-float"
-      viewBox="0 0 300 300"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <defs>
-        <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#5b7dff" stopOpacity="0.2" />
-          <stop offset="100%" stopColor="#3746e6" stopOpacity="0.1" />
-        </linearGradient>
-        <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#4361ff" stopOpacity="0.4" />
-          <stop offset="100%" stopColor="#5b7dff" stopOpacity="0.2" />
-        </linearGradient>
-      </defs>
-
-      {/* Background circle */}
-      <circle cx="150" cy="150" r="140" fill="url(#grad1)" />
-
-      {/* Abstract shapes - representing verification */}
-      <rect x="80" y="80" width="140" height="140" rx="20" fill="none" stroke="#5b7dff" strokeWidth="2" opacity="0.6" />
-
-      {/* Inner shield/checkmark concept */}
-      <g opacity="0.8">
-        <path
-          d="M150 100 L180 130 L160 160 M140 155 L145 160 L155 150"
-          stroke="#4361ff"
-          strokeWidth="3"
+    <div className="relative w-full h-full max-w-md mx-auto">
+      {/* Circular Video Container */}
+      <div className="relative w-full aspect-square animate-float">
+        <svg
+          className="absolute inset-0 w-full h-full"
+          viewBox="0 0 300 300"
           fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </g>
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#5b7dff" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#3746e6" stopOpacity="0.1" />
+            </linearGradient>
+            <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#4361ff" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#5b7dff" stopOpacity="0.2" />
+            </linearGradient>
+            <clipPath id="circleClip">
+              <circle cx="150" cy="150" r="140" />
+            </clipPath>
+          </defs>
 
-      {/* Circular elements - representing flow */}
-      <circle cx="100" cy="100" r="8" fill="#7d9dff" opacity="0.6" />
-      <circle cx="200" cy="100" r="8" fill="#7d9dff" opacity="0.6" />
-      <circle cx="100" cy="200" r="8" fill="#7d9dff" opacity="0.6" />
-      <circle cx="200" cy="200" r="8" fill="#7d9dff" opacity="0.6" />
+          {/* Background circle with gradient */}
+          <circle cx="150" cy="150" r="140" fill="url(#grad1)" />
 
-      {/* Connecting lines */}
-      <line x1="100" y1="100" x2="200" y2="100" stroke="#a3baff" strokeWidth="1" opacity="0.4" strokeDasharray="5,5" />
-      <line x1="100" y1="100" x2="100" y2="200" stroke="#a3baff" strokeWidth="1" opacity="0.4" strokeDasharray="5,5" />
-      <line x1="200" y1="100" x2="200" y2="200" stroke="#a3baff" strokeWidth="1" opacity="0.4" strokeDasharray="5,5" />
-      <line x1="100" y1="200" x2="200" y2="200" stroke="#a3baff" strokeWidth="1" opacity="0.4" strokeDasharray="5,5" />
+          {/* Video in circular form */}
+          <foreignObject x="10" y="10" width="280" height="280" clipPath="url(#circleClip)">
+            <div className="w-full h-full flex items-center justify-center">
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-full object-cover"
+              >
+                <source src="/videos/🎥_KYC_Face_Scanning_–_Video_P (1).mp4" type="video/mp4" />
+              </video>
+            </div>
+          </foreignObject>
 
-      {/* Central decorative element */}
-      <g opacity="0.7">
-        <circle cx="150" cy="150" r="30" fill="none" stroke="url(#grad2)" strokeWidth="2" />
-        <circle cx="150" cy="150" r="20" fill="none" stroke="#5b7dff" strokeWidth="1" opacity="0.5" />
-      </g>
-    </svg>
+          {/* Decorative border rings */}
+          <circle cx="150" cy="150" r="145" fill="none" stroke="url(#grad2)" strokeWidth="2" opacity="0.5" />
+          <circle cx="150" cy="150" r="135" fill="none" stroke="#5b7dff" strokeWidth="1" opacity="0.3" />
+
+          {/* Corner decorative elements */}
+          <circle cx="100" cy="100" r="8" fill="#7d9dff" opacity="0.6" />
+          <circle cx="200" cy="100" r="8" fill="#7d9dff" opacity="0.6" />
+          <circle cx="100" cy="200" r="8" fill="#7d9dff" opacity="0.6" />
+          <circle cx="200" cy="200" r="8" fill="#7d9dff" opacity="0.6" />
+
+          {/* Connecting lines */}
+          <line x1="100" y1="100" x2="200" y2="100" stroke="#a3baff" strokeWidth="1" opacity="0.4" strokeDasharray="5,5" />
+          <line x1="100" y1="100" x2="100" y2="200" stroke="#a3baff" strokeWidth="1" opacity="0.4" strokeDasharray="5,5" />
+          <line x1="200" y1="100" x2="200" y2="200" stroke="#a3baff" strokeWidth="1" opacity="0.4" strokeDasharray="5,5" />
+          <line x1="100" y1="200" x2="200" y2="200" stroke="#a3baff" strokeWidth="1" opacity="0.4" strokeDasharray="5,5" />
+        </svg>
+      </div>
+    </div>
   )
 }
 
@@ -69,7 +75,10 @@ export function HeroSection() {
     <section
       ref={ref}
       className={`
-        min-h-screen flex items-center justify-center py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-white to-primary-50/30
+        min-h-screen flex items-center justify-center py-20 px-4 sm:px-6 lg:px-8 
+        bg-gradient-to-b from-white via-white to-primary-50/30 
+        dark:from-dark-900 dark:via-dark-900 dark:to-dark-800/50
+        transition-colors duration-300
         ${isVisible ? 'animate-fade-in' : 'opacity-0'}
       `}
     >
@@ -79,19 +88,19 @@ export function HeroSection() {
           <div className={`order-2 lg:order-1 ${isVisible ? 'animate-slide-up' : ''}`}>
             {/* Badge */}
             <div className="mb-6 inline-block">
-              <span className="px-4 py-2 rounded-full bg-primary-100 text-primary-700 text-sm font-medium">
+              <span className="px-4 py-2 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-sm font-medium border border-primary-200 dark:border-primary-800/50 shadow-sm">
                 ✨ AI-Powered Identity Verification
               </span>
             </div>
 
             {/* Headline */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-dark-900 mb-6 leading-tight">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-dark-900 dark:text-dark-50 mb-6 leading-tight">
               Secure Onboarding
-              <span className="block gradient-text">in Seconds</span>
+              <span className="block bg-gradient-to-r from-primary-600 to-primary-700 dark:from-primary-400 dark:to-primary-500 bg-clip-text text-transparent">in Seconds</span>
             </h1>
 
             {/* Subtext */}
-            <p className="text-lg sm:text-xl text-dark-500 mb-8 leading-relaxed max-w-lg">
+            <p className="text-lg sm:text-xl text-dark-600 dark:text-dark-400 mb-8 leading-relaxed max-w-lg">
               Enterprise-grade identity verification platform with AI-powered document OCR, real-time fraud detection, and global AML compliance. Reduce onboarding friction while maintaining security.
             </p>
 
@@ -122,17 +131,17 @@ export function HeroSection() {
             </div>
 
             {/* Trust indicators */}
-            <div className="flex flex-wrap gap-6 text-sm text-dark-600">
+            <div className="flex flex-wrap gap-6 text-sm text-dark-600 dark:text-dark-400">
               <div className="flex items-center gap-2">
-                <span className="text-primary-600 font-bold">98%</span>
+                <span className="text-primary-600 dark:text-primary-400 font-bold">98%</span>
                 <span>Accuracy Rate</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-primary-600 font-bold">150+</span>
+                <span className="text-primary-600 dark:text-primary-400 font-bold">150+</span>
                 <span>Countries</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-primary-600 font-bold">SOC 2</span>
+                <span className="text-primary-600 dark:text-primary-400 font-bold">SOC 2</span>
                 <span>Certified</span>
               </div>
             </div>

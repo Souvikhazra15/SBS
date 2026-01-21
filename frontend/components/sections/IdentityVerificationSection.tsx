@@ -59,17 +59,17 @@ export function IdentityVerificationSection() {
   const { ref, isVisible } = useScrollAnimation()
 
   return (
-    <section ref={ref} id="identity-verification" className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
+    <section ref={ref} id="identity-verification" className="py-20 px-4 sm:px-6 lg:px-8 bg-white dark:bg-dark-900 transition-colors">
       <div className="container-wide">
         {/* Header */}
         <div className={`text-center mb-16 ${isVisible ? 'animate-slide-up' : ''}`}>
-          <div className="inline-flex p-4 rounded-lg bg-primary-100 text-primary-600 mb-6">
+          <div className="inline-flex p-4 rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 mb-6">
             <ShieldVerifyIcon className="w-12 h-12" />
           </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-dark-900 mb-4">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-dark-900 dark:text-white mb-4">
             Identity Verification Platform
           </h2>
-          <p className="text-lg text-dark-600 max-w-3xl mx-auto">
+          <p className="text-lg text-dark-600 dark:text-dark-400 max-w-3xl mx-auto">
             Our comprehensive identity verification solution combines multiple verification methods to ensure user authenticity while maintaining a seamless onboarding experience. Powered by advanced AI and machine learning.
           </p>
         </div>
@@ -84,20 +84,20 @@ export function IdentityVerificationSection() {
           ].map((stat, index) => (
             <div
               key={index}
-              className={`text-center p-6 rounded-lg bg-primary-50 border border-primary-200 transition-all duration-300 ${
+              className={`text-center p-6 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/30 transition-all duration-300 ${
                 isVisible ? 'animate-fade-in' : 'opacity-0'
               }`}
               style={{ '--animation-delay': `${index * 100}ms` } as React.CSSProperties}
             >
-              <p className="text-3xl font-bold text-primary-600 mb-2">{stat.value}</p>
-              <p className="text-sm font-medium text-dark-600">{stat.label}</p>
+              <p className="text-3xl font-bold text-primary-600 dark:text-primary-400 mb-2">{stat.value}</p>
+              <p className="text-sm font-medium text-dark-600 dark:text-dark-400">{stat.label}</p>
             </div>
           ))}
         </div>
 
         {/* Verification Methods Grid */}
         <div className="mb-16">
-          <h3 className="text-2xl font-bold text-dark-900 mb-8 text-center">Verification Methods</h3>
+          <h3 className="text-2xl font-bold text-dark-900 dark:text-white mb-8 text-center">Verification Methods</h3>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {verificationFeatures.map((feature, index) => {
               const Icon = feature.icon
@@ -111,17 +111,17 @@ export function IdentityVerificationSection() {
                 >
                   <Card className="h-full flex flex-col hover:shadow-xl hover:scale-105 transition-all duration-300">
                     {/* Icon */}
-                    <div className="mb-6 inline-flex p-4 rounded-lg bg-primary-100 text-primary-600 w-fit">
+                    <div className="mb-6 inline-flex p-4 rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 w-fit">
                       <Icon className="w-8 h-8" />
                     </div>
 
                     {/* Title */}
-                    <h4 className="text-xl font-semibold text-dark-900 mb-3">
+                    <h4 className="text-xl font-semibold text-dark-900 dark:text-white mb-3">
                       {feature.title}
                     </h4>
 
                     {/* Description */}
-                    <p className="text-dark-600 mb-6 flex-grow">
+                    <p className="text-dark-600 dark:text-dark-400 mb-6 flex-grow">
                       {feature.description}
                     </p>
 
@@ -129,8 +129,8 @@ export function IdentityVerificationSection() {
                     <div className="space-y-2">
                       {feature.features.map((item, i) => (
                         <div key={i} className="flex items-start gap-3">
-                          <span className="text-primary-600 font-bold mt-1">✓</span>
-                          <span className="text-sm text-dark-700">{item}</span>
+                          <span className="text-primary-600 dark:text-primary-400 font-bold mt-1">✓</span>
+                          <span className="text-sm text-dark-700 dark:text-dark-300">{item}</span>
                         </div>
                       ))}
                     </div>
@@ -142,8 +142,8 @@ export function IdentityVerificationSection() {
         </div>
 
         {/* How It Works */}
-        <div className="bg-dark-50 rounded-xl p-8 md:p-12">
-          <h3 className="text-2xl font-bold text-dark-900 mb-8 text-center">How Our Verification Works</h3>
+        <div className="bg-dark-50 dark:bg-dark-800/50 rounded-xl p-8 md:p-12">
+          <h3 className="text-2xl font-bold text-dark-900 dark:text-white mb-8 text-center">How Our Verification Works</h3>
           <div className="grid md:grid-cols-4 gap-6">
             {[
               {
@@ -168,11 +168,11 @@ export function IdentityVerificationSection() {
               },
             ].map((item, index) => (
               <div key={index} className="text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-600 text-white font-bold text-xl mb-4 mx-auto">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-600 dark:bg-primary-500 text-white font-bold text-xl mb-4 mx-auto">
                   {item.step}
                 </div>
-                <h4 className="font-semibold text-dark-900 mb-2">{item.title}</h4>
-                <p className="text-sm text-dark-600">{item.description}</p>
+                <h4 className="font-semibold text-dark-900 dark:text-white mb-2">{item.title}</h4>
+                <p className="text-sm text-dark-600 dark:text-dark-400">{item.description}</p>
               </div>
             ))}
           </div>
@@ -180,7 +180,7 @@ export function IdentityVerificationSection() {
 
         {/* Benefits Section */}
         <div className="mt-16">
-          <h3 className="text-2xl font-bold text-dark-900 mb-8 text-center">Key Benefits</h3>
+          <h3 className="text-2xl font-bold text-dark-900 dark:text-white mb-8 text-center">Key Benefits</h3>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               {
@@ -209,8 +209,8 @@ export function IdentityVerificationSection() {
               },
             ].map((benefit, index) => (
               <Card key={index} className="p-6 hover:shadow-lg transition-shadow duration-300">
-                <h4 className="text-lg font-semibold text-dark-900 mb-3">{benefit.title}</h4>
-                <p className="text-dark-600 text-sm">{benefit.description}</p>
+                <h4 className="text-lg font-semibold text-dark-900 dark:text-white mb-3">{benefit.title}</h4>
+                <p className="text-dark-600 dark:text-dark-400 text-sm">{benefit.description}</p>
               </Card>
             ))}
           </div>
@@ -218,10 +218,10 @@ export function IdentityVerificationSection() {
 
         {/* CTA */}
         <div className="mt-16 text-center">
-          <p className="text-dark-600 mb-6">
+          <p className="text-dark-600 dark:text-dark-400 mb-6">
             Ready to implement our identity verification platform?
           </p>
-          <button className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors duration-300">
+          <button className="px-8 py-3 bg-primary-600 hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600 text-white font-semibold rounded-lg transition-colors duration-300">
             Get Started Today
           </button>
         </div>

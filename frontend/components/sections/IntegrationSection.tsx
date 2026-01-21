@@ -36,14 +36,14 @@ export function IntegrationSection() {
   const { ref, isVisible } = useScrollAnimation()
 
   return (
-    <section ref={ref} className="py-20 px-4 sm:px-6 lg:px-8 bg-dark-50">
+    <section ref={ref} id="integration" className="py-20 px-4 sm:px-6 lg:px-8 bg-dark-50 dark:bg-dark-900/50 transition-colors">
       <div className="container-wide">
         {/* Header */}
         <div className={`text-center mb-16 ${isVisible ? 'animate-slide-up' : ''}`}>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-dark-900 mb-4">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-dark-900 dark:text-dark-50 mb-4">
             Easy Integration
           </h2>
-          <p className="text-lg text-dark-500 max-w-2xl mx-auto">
+          <p className="text-lg text-dark-500 dark:text-dark-400 max-w-2xl mx-auto">
             Multiple integration methods to fit your tech stack. Start building in minutes.
           </p>
         </div>
@@ -68,17 +68,17 @@ export function IntegrationSection() {
               {/* Content */}
               <div className="relative">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 rounded-lg bg-primary-100">
-                    <APIIcon className="w-5 h-5 text-primary-600" />
+                  <div className="p-2 rounded-lg bg-primary-100 dark:bg-primary-900/30">
+                    <APIIcon className="w-5 h-5 text-primary-600 dark:text-primary-400" />
                   </div>
-                  <h3 className="text-lg font-semibold text-dark-900">
+                  <h3 className="text-lg font-semibold text-dark-900 dark:text-dark-50">
                     {integration.label}
                   </h3>
                 </div>
-                <p className="text-dark-600 mb-4">
+                <p className="text-dark-600 dark:text-dark-400 mb-4">
                   {integration.description}
                 </p>
-                <div className="bg-dark-900 text-primary-300 px-3 py-2 rounded-lg text-xs font-mono mb-4 overflow-x-auto">
+                <div className="bg-dark-900 dark:bg-dark-950 text-primary-300 dark:text-primary-400 px-3 py-2 rounded-lg text-xs font-mono mb-4 overflow-x-auto border border-dark-800 dark:border-dark-700">
                   {integration.example}
                 </div>
               </div>
@@ -87,7 +87,7 @@ export function IntegrationSection() {
               <div className="mt-auto">
                 <a
                   href="#"
-                  className="text-primary-600 font-medium text-sm hover:text-primary-700 inline-flex items-center gap-2 transition-colors"
+                  className="text-primary-600 dark:text-primary-400 font-medium text-sm hover:text-primary-700 dark:hover:text-primary-300 inline-flex items-center gap-2 transition-colors"
                 >
                   Learn more →
                 </a>
