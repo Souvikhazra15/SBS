@@ -15,15 +15,16 @@ const sizeClasses = {
 }
 
 const variantClasses = {
-  primary: 'bg-primary-600 text-white hover:bg-primary-700 active:scale-95',
-  secondary: 'bg-primary-100 text-primary-700 hover:bg-primary-200 active:scale-95',
-  outline: 'border-2 border-primary-600 text-primary-600 hover:bg-primary-50 active:scale-95',
+  primary: 'bg-primary-600 dark:bg-primary-500 text-white hover:bg-primary-700 dark:hover:bg-primary-600 active:scale-95 shadow-sm hover:shadow-md',
+  secondary: 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-800/40 active:scale-95',
+  outline: 'border-2 border-primary-600 dark:border-primary-500 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 active:scale-95',
 }
 
 export function Button({ 
   variant = 'primary', 
   size = 'md', 
   className = '',
+  disabled,
   ...props 
 }: ButtonProps) {
   return (
@@ -32,8 +33,10 @@ export function Button({
         rounded-lg font-medium transition-all duration-200
         ${sizeClasses[size]}
         ${variantClasses[variant]}
+        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         ${className}
       `}
+      disabled={disabled}
       {...props}
     />
   )
