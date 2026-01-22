@@ -35,7 +35,8 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
     setLoading(true)
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/login', {
+      console.log('[AUTH][FRONTEND] login attempt', { email: loginEmail })
+      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -46,6 +47,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
       })
 
       const data = await response.json()
+      console.log('[AUTH][FRONTEND] login response', data)
 
       if (!response.ok) {
         throw new Error(data.error || 'Login failed')
@@ -66,7 +68,8 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
     setLoading(true)
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/signup', {
+      console.log('[AUTH][FRONTEND] signup attempt', { email: signupEmail, firstName: signupFirstName })
+      const response = await fetch('http://localhost:8000/api/v1/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -80,6 +83,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
       })
 
       const data = await response.json()
+      console.log('[AUTH][FRONTEND] signup response', data)
 
       if (!response.ok) {
         throw new Error(data.error || 'Signup failed')

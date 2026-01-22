@@ -26,6 +26,7 @@ export default function LoginPage() {
       })
 
       const data = await response.json()
+      console.log('[AUTH][LOGIN PAGE] response', data)
 
       if (!response.ok) {
         throw new Error(data.error || 'Login failed')

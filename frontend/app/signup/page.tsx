@@ -36,6 +36,7 @@ export default function SignupPage() {
       })
 
       const data = await response.json()
+      console.log('[AUTH][SIGNUP PAGE] response', data)
 
       if (!response.ok) {
         throw new Error(data.error || 'Signup failed')

@@ -64,6 +64,7 @@ model User {
   documents         Document[]
   auditLogs         AuditLog[]
   apiKeys           ApiKey[]
+  verificationSessions VerificationSession[]
   
   @@index([email])
   @@index([status])
@@ -455,6 +456,63 @@ model RiskAssessment {
   @@index([verificationId])
   @@index([riskLevel])
   @@map("risk_assessments")
+}
+
+// ============================================
+// FEATURE-SPECIFIC VERIFICATION SESSIONS
+// ============================================
+
+enum VerificationDecision {
+  APPROVED
+  REJECTED
+  MANUAL_REVIEW
+  PENDING
+}
+
+model VerificationSession {
+  id            String              @id @default(cuid())
+  userId        String
+  documentPath  String?
+  selfiePath    String?
+  
+  // Feature Scores
+  forgeryScore      Float?          // 0-100 (Fake Document Detection)
+  faceMatchScore    Float?          // 0-100 (Face Matching)
+  deepfakeScore     Float?          // 0-100 (Deepfake Detection)
+  riskScore         Float?          // 0-1000 (Risk Scoring)
+  
+  // Final Decision
+  decision          VerificationDecision @default(PENDING)
+  
+  // Metadata
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  // Relations
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  featureResults    FeatureResult[]
+  
+  @@index([userId])
+  @@index([createdAt])
+  @@map("verification_sessions")
+}
+
+model FeatureResult {
+  id            String              @id @default(cuid())
+  sessionId     String
+  featureName   String              // 'fake_document', 'face_matching', 'deepfake', 'risk_scoring'
+  score         Float               // Feature-specific score
+  metadata      Json?               // Additional feature-specific data
+  
+  // Metadata
+  createdAt     DateTime            @default(now())
+  
+  // Relations
+  session       VerificationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([featureName])
+  @@map("feature_results")
 }
 
 // ============================================

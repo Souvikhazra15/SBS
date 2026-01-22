@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { Card } from '@/components/Card'
+import { FeatureCard } from '@/components/FeatureCard'
 import { useScrollAnimation } from '@/hooks/useScrollAnimation'
 import {
   ShieldVerifyIcon,
@@ -19,6 +20,7 @@ const verificationFeatures = [
       'Geolocation Verification',
       'Multi-Document Cross-Reference',
     ],
+    href: '/features/fake-document',
   },
   {
     icon: CheckCircleIcon,
@@ -30,6 +32,7 @@ const verificationFeatures = [
       'Anti-Spoofing Technology',
       'High Accuracy Matching',
     ],
+    href: '/features/face-matching',
   },
   {
     icon: ShieldVerifyIcon,
@@ -41,6 +44,7 @@ const verificationFeatures = [
       'Behavioral Analysis',
       'Real-time Alert System',
     ],
+    href: '/features/deepfake',
   },
   {
     icon: CheckCircleIcon,
@@ -52,6 +56,7 @@ const verificationFeatures = [
       'Historical Data Analysis',
       'Continuous Learning',
     ],
+    href: '/features/risk-scoring',
   },
 ]
 
@@ -99,45 +104,18 @@ export function IdentityVerificationSection() {
         <div className="mb-16">
           <h3 className="text-2xl font-bold text-dark-900 dark:text-white mb-8 text-center">Verification Methods</h3>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {verificationFeatures.map((feature, index) => {
-              const Icon = feature.icon
-              return (
-                <div
-                  key={index}
-                  className={`transition-all duration-300 ${
-                    isVisible ? 'animate-fade-in' : 'opacity-0'
-                  }`}
-                  style={{ '--animation-delay': `${index * 150}ms` } as React.CSSProperties}
-                >
-                  <Card className="h-full flex flex-col hover:shadow-xl hover:scale-105 transition-all duration-300">
-                    {/* Icon */}
-                    <div className="mb-6 inline-flex p-4 rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 w-fit">
-                      <Icon className="w-8 h-8" />
-                    </div>
-
-                    {/* Title */}
-                    <h4 className="text-xl font-semibold text-dark-900 dark:text-white mb-3">
-                      {feature.title}
-                    </h4>
-
-                    {/* Description */}
-                    <p className="text-dark-600 dark:text-dark-400 mb-6 flex-grow">
-                      {feature.description}
-                    </p>
-
-                    {/* Features List */}
-                    <div className="space-y-2">
-                      {feature.features.map((item, i) => (
-                        <div key={i} className="flex items-start gap-3">
-                          <span className="text-primary-600 dark:text-primary-400 font-bold mt-1">✓</span>
-                          <span className="text-sm text-dark-700 dark:text-dark-300">{item}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
-                </div>
-              )
-            })}
+            {verificationFeatures.map((feature, index) => (
+              <FeatureCard
+                key={index}
+                icon={feature.icon}
+                title={feature.title}
+                description={feature.description}
+                features={feature.features}
+                href={feature.href}
+                index={index}
+                isVisible={isVisible}
+              />
+            ))}
           </div>
         </div>
 
