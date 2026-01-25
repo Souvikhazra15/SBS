@@ -2,371 +2,209 @@
 Deepfake Detection API Routes
 
 RESTful endpoints for synthetic media and deepfake detection.
-Supports both image and video analysis with advanced AI models.
+Supports both image and video analysis with real trained model.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from typing import Dict, Any, Optional, List
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import JSONResponse
+from typing import Dict, Any, Optional
 from datetime import datetime
+import logging
+import tempfile
+import os
+import uuid
+import traceback
 
-from src.schemas.feature import DeepfakeRequest, FeatureRunResponse
 from src.services.deepfake_service import DeepfakeService
 from src.utils.auth import get_current_active_user
 from src.config.prisma import prisma
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/deepfake", tags=["Deepfake Detection"])
 service = DeepfakeService()
 
-@router.post("/run", response_model=FeatureRunResponse)
-async def run_deepfake_detection(
-    deepfake_request: DeepfakeRequest,
-    current_user: dict = Depends(get_current_active_user)
+@router.post("/upload")
+async def upload_and_analyze(
+    file: UploadFile = File(...),
+    current_user: Optional[dict] = Depends(get_current_active_user)
 ):
     """
-    Run deepfake detection on uploaded media file.
+    Upload video/image and run deepfake detection with real trained model.
     
-    - **media_file**: Base64 encoded image or video file
-    - **media_type**: Type of media ('image' or 'video')
+    - **file**: Video or image file (mp4, mov, avi, jpg, png)
     
-    Returns detailed deepfake analysis including:
-    - Deepfake probability score (0-100)
-    - Authenticity confidence level
-    - Artifact detection results
-    - Frame-by-frame analysis (for videos)
+    Returns structured JSON with deepfake analysis results.
     """
+    session_id = str(uuid.uuid4())
+    temp_file_path = None
+    
     try:
-        # Validate media type
-        if deepfake_request.media_type.lower() not in ["image", "video"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Media type must be 'image' or 'video'"
-            )
+        logger.info(f"[DEEPFAKE] File received: {file.filename} ({file.content_type})")
         
-        # Run deepfake analysis
-        analysis_result = service.analyze_media(
-            deepfake_request.media_file,
-            deepfake_request.media_type
-        )
+        # Validate file type
+        allowed_video = ["video/mp4", "video/avi", "video/quicktime", "video/x-msvideo"]
+        allowed_image = ["image/jpeg", "image/png", "image/jpg"]
         
-        if "error" in analysis_result:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Deepfake analysis failed: {analysis_result['error']}"
-            )
+        is_video = file.content_type in allowed_video
+        is_image = file.content_type in allowed_image
         
-        # Create verification session
-        session_data = {
-            "userId": current_user["id"],
-            "deepfakeScore": analysis_result["deepfake_score"]
-        }
-        
-        # Add media path based on type
-        if deepfake_request.media_type.lower() == "image":
-            session_data["selfiePath"] = "base64_media"
-        
-        session = await prisma.verificationsession.create(session_data)
-        
-        # Store feature result
-        await prisma.featureresult.create({
-            "sessionId": session.id,
-            "featureName": "deepfake",
-            "score": analysis_result["deepfake_score"],
-            "metadata": analysis_result
-        })
-        
-        return FeatureRunResponse(
-            session_id=session.id,
-            feature_name="deepfake",
-            score=analysis_result["deepfake_score"],
-            metadata=analysis_result,
-            processing_time_ms=analysis_result.get("processing_time_ms"),
-            status="completed",
-            created_at=session.createdAt
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
-        )
-
-@router.get("/{session_id}", response_model=FeatureRunResponse)
-async def get_deepfake_result(
-    session_id: str,
-    current_user: dict = Depends(get_current_active_user)
-):
-    """
-    Retrieve deepfake detection results for a specific session.
-    
-    - **session_id**: UUID of the verification session
-    
-    Returns stored deepfake analysis results including scores and detailed metadata.
-    """
-    try:
-        feature_result = await prisma.featureresult.find_first(
-            where={
-                "sessionId": session_id,
-                "featureName": "deepfake",
-                "session": {
-                    "userId": current_user["id"]
+        if not (is_video or is_image):
+            logger.warning(f"[DEEPFAKE] Invalid file type: {file.content_type}")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": "Only video (mp4, mov, avi) and image (jpg, png) files are supported"
                 }
-            },
-            include={
-                "session": True
-            }
-        )
-        
-        if not feature_result:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Deepfake detection result not found for this session"
             )
         
-        return FeatureRunResponse(
-            session_id=feature_result.sessionId,
-            feature_name=feature_result.featureName,
-            score=feature_result.score,
-            metadata=feature_result.metadata,
-            status="completed",
-            created_at=feature_result.createdAt
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
-        )
-
-@router.post("/upload", response_model=Dict[str, Any])
-async def upload_media_file(
-    file: UploadFile = File(..., description="Image or video file for analysis"),
-    current_user: dict = Depends(get_current_active_user)
-):
-    """
-    Upload media file for deepfake detection.
-    
-    - **file**: Image or video file (JPEG, PNG, MP4, AVI, MOV)
-    
-    Returns deepfake analysis results for the uploaded media.
-    """
-    try:
-        # Determine media type from file
-        content_type = file.content_type
-        if content_type.startswith("image/"):
-            media_type = "image"
-        elif content_type.startswith("video/"):
-            media_type = "video"
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Only image and video files are supported"
-            )
-        
-        # Validate file size
+        # Validate file size (max 100MB)
         content = await file.read()
-        max_size = 50 * 1024 * 1024 if media_type == "video" else 10 * 1024 * 1024  # 50MB for video, 10MB for image
+        file_size_mb = len(content) / (1024 * 1024)
+        logger.info(f"[DEEPFAKE] File size: {file_size_mb:.2f} MB")
         
-        if len(content) > max_size:
-            max_size_mb = max_size // (1024 * 1024)
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File too large. Maximum {max_size_mb}MB allowed for {media_type}"
+        if len(content) > 100 * 1024 * 1024:  # 100MB
+            logger.warning(f"[DEEPFAKE] File too large: {file_size_mb:.2f} MB")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": f"File size ({file_size_mb:.2f} MB) exceeds maximum allowed (100 MB)"
+                }
             )
         
-        # Convert to base64 for processing
-        import base64
-        base64_content = base64.b64encode(content).decode('utf-8')
+        # Save to temporary file
+        suffix = os.path.splitext(file.filename)[1]
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+            temp_file.write(content)
+            temp_file_path = temp_file.name
         
-        # Run deepfake analysis
-        analysis_result = service.analyze_media(base64_content, media_type)
+        logger.info(f"[DEEPFAKE] Temporary file created: {temp_file_path}")
+        
+        # Run analysis based on file type
+        if is_video:
+            logger.info("[DEEPFAKE] Analyzing video...")
+            analysis_result = service.analyze_video(temp_file_path)
+        else:
+            logger.info("[DEEPFAKE] Analyzing image...")
+            # Convert file to base64 for image analysis
+            import base64
+            base64_content = base64.b64encode(content).decode('utf-8')
+            analysis_result = service.analyze_image(base64_content)
         
         if "error" in analysis_result:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Deepfake analysis failed: {analysis_result['error']}"
+            logger.error(f"[DEEPFAKE] Analysis failed: {analysis_result['error']}")
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "error": f"Deepfake analysis failed: {analysis_result['error']}"
+                }
             )
         
-        # Create session and store results
-        session_data = {
-            "userId": current_user["id"],
-            "deepfakeScore": analysis_result["deepfake_score"]
-        }
-        
-        if media_type == "image":
-            session_data["selfiePath"] = file.filename
-        
-        session = await prisma.verificationsession.create(session_data)
-        
-        await prisma.featureresult.create({
-            "sessionId": session.id,
-            "featureName": "deepfake",
-            "score": analysis_result["deepfake_score"],
-            "metadata": analysis_result
-        })
-        
-        return {
-            "session_id": session.id,
-            "filename": file.filename,
-            "media_type": media_type,
-            "file_size": len(content),
-            "analysis_result": analysis_result,
-            "status": "completed"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Upload failed: {str(e)}"
-        )
-
-@router.post("/batch-analyze", response_model=List[Dict[str, Any]])
-async def batch_deepfake_analysis(
-    files: List[UploadFile] = File(..., description="Multiple media files for batch analysis"),
-    current_user: dict = Depends(get_current_active_user)
-):
-    """
-    Analyze multiple media files for deepfake content in batch.
-    
-    - **files**: List of image/video files (max 10 files)
-    
-    Returns array of analysis results for each file.
-    """
-    try:
-        # Limit batch size
-        if len(files) > 10:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Maximum 10 files allowed in batch analysis"
-            )
-        
-        results = []
-        
-        for file in files:
+        # Save to database if user is authenticated
+        if current_user:
+            logger.info("[DEEPFAKE] Saving results to database...")
             try:
-                # Determine media type
-                content_type = file.content_type
-                if content_type.startswith("image/"):
-                    media_type = "image"
-                elif content_type.startswith("video/"):
-                    media_type = "video"
-                else:
-                    results.append({
-                        "filename": file.filename,
-                        "error": "Unsupported file type",
-                        "status": "failed"
-                    })
-                    continue
-                
-                # Read and validate file
-                content = await file.read()
-                max_size = 20 * 1024 * 1024  # 20MB limit for batch processing
-                
-                if len(content) > max_size:
-                    results.append({
-                        "filename": file.filename,
-                        "error": "File too large for batch processing (max 20MB)",
-                        "status": "failed"
-                    })
-                    continue
-                
-                # Convert to base64 and analyze
-                import base64
-                base64_content = base64.b64encode(content).decode('utf-8')
-                
-                analysis_result = service.analyze_media(base64_content, media_type)
-                
-                if "error" in analysis_result:
-                    results.append({
-                        "filename": file.filename,
-                        "error": analysis_result["error"],
-                        "status": "failed"
-                    })
-                    continue
-                
-                # Create session (simplified for batch)
-                session = await prisma.verificationsession.create({
+                session = await prisma.verificationSession.create({
                     "userId": current_user["id"],
-                    "deepfakeScore": analysis_result["deepfake_score"]
+                    "selfiePath": file.filename,
+                    "deepfakeScore": analysis_result.get("deepfake_score", 0.0),
+                    "decision": analysis_result.get("decision", "UNKNOWN")
                 })
+                session_id = session["id"]
                 
-                await prisma.featureresult.create({
-                    "sessionId": session.id,
+                await prisma.featureResult.create({
+                    "sessionId": session_id,
                     "featureName": "deepfake",
-                    "score": analysis_result["deepfake_score"],
+                    "score": analysis_result.get("deepfake_score", 0.0),
                     "metadata": analysis_result
                 })
                 
-                results.append({
-                    "filename": file.filename,
-                    "session_id": session.id,
-                    "media_type": media_type,
-                    "deepfake_score": analysis_result["deepfake_score"],
-                    "is_deepfake": analysis_result["is_deepfake"],
-                    "confidence": analysis_result["confidence_level"],
-                    "status": "completed"
-                })
-                
-            except Exception as file_error:
-                results.append({
-                    "filename": file.filename,
-                    "error": str(file_error),
-                    "status": "failed"
-                })
+                logger.info(f"[DEEPFAKE] Results saved to database - Session ID: {session_id}")
+            except Exception as db_error:
+                logger.error(f"[DEEPFAKE] Database error: {str(db_error)}")
+                # Continue even if DB fails
+        else:
+            logger.info("[DEEPFAKE] Running in demo mode (no authentication)")
         
-        return results
+        logger.info(f"[DEEPFAKE] Analysis complete - Processing time: {analysis_result.get('processing_time_ms', 0)} ms")
         
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Batch analysis failed: {str(e)}"
+        # Return structured response
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "sessionId": session_id,
+                "deepfakeScore": analysis_result.get("deepfake_score", 0.0),
+                "decision": analysis_result.get("decision", "UNKNOWN"),
+                "isDeepfake": analysis_result.get("is_deepfake", False),
+                "confidence": analysis_result.get("confidence_level", 0.0),
+                "framesAnalyzed": analysis_result.get("frames_analyzed", 0),
+                "statistics": analysis_result.get("statistics", {}),
+                "processingTimeMs": analysis_result.get("processing_time_ms", 0),
+                "modelVersion": analysis_result.get("model_version", "unknown"),
+                "device": analysis_result.get("device", "unknown"),
+                "timestamp": analysis_result.get("timestamp", datetime.utcnow().isoformat())
+            }
         )
+        
+    except HTTPException as he:
+        logger.error(f"[DEEPFAKE] HTTP Exception: {str(he)}")
+        return JSONResponse(
+            status_code=he.status_code,
+            content={
+                "success": False,
+                "error": he.detail
+            }
+        )
+    except Exception as e:
+        logger.error(f"[DEEPFAKE] Unexpected error: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": f"Internal server error: {str(e)}"
+            }
+        )
+    finally:
+        # Cleanup temporary file
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.unlink(temp_file_path)
+                logger.info(f"[DEEPFAKE] Temporary file deleted: {temp_file_path}")
+            except Exception as cleanup_error:
+                logger.warning(f"[DEEPFAKE] Failed to delete temp file: {cleanup_error}")
 
 @router.get("/info")
 async def get_service_info():
-    """
-    Get information about the deepfake detection service.
-    
-    Returns model capabilities, supported formats, and detection features.
-    """
-    return {
-        "service_name": "Deepfake Detection",
-        **service.get_model_info(),
-        "capabilities": [
-            "Image deepfake detection",
-            "Video deepfake detection",
-            "Facial artifact analysis",
-            "Temporal consistency checking",
-            "Generation artifact detection",
-            "Pixel-level analysis",
-            "Frequency domain analysis"
-        ],
-        "detection_methods": [
-            "Neural network analysis",
-            "Facial landmark consistency",
-            "Skin texture analysis",
-            "Eye reflection validation",
-            "Motion pattern analysis",
-            "Lip-sync accuracy",
-            "Compression artifact detection"
-        ]
-    }
+    """Get information about the deepfake detection service."""
+    return service.get_model_info()
 
 @router.get("/health")
 async def health_check():
-    """
-    Health check endpoint for service monitoring.
-    """
-    return {
-        "status": "healthy",
-        "service": "deepfake_detection",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": service.model_version
-    }
+    """Health check endpoint for service monitoring."""
+    try:
+        model_info = service.get_model_info()
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "healthy",
+                "service": "deepfake_detection",
+                "model_loaded": model_info.get("model_loaded", False),
+                "device": model_info.get("device", "unknown"),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+    except Exception as e:
+        logger.error(f"[DEEPFAKE] Health check failed: {str(e)}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )

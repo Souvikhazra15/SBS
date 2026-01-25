@@ -1,34 +1,131 @@
 """
-Deepfake Detection Service
+Deepfake Detection Service - Real PyTorch Model Implementation
 
-Sophisticated AI for detecting synthetic faces and video manipulations.
-Uses advanced neural networks and behavioral analysis.
+Uses trained CNN/LSTM model for detecting deepfakes in videos and images.
+Auto-downloads model from Google Drive if not present.
 """
 
 import base64
 import io
-import json
 import time
+import logging
+import os
+import tempfile
+import hashlib
+from pathlib import Path
 from typing import Dict, Any, Optional, List
 from PIL import Image
 import numpy as np
+import cv2
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
+
+# Lazy imports for heavy dependencies
+torch = None
+gdown = None
+
 class DeepfakeService:
-    """Service for detecting deepfakes and synthetic media using advanced AI models."""
+    """Service for detecting deepfakes using trained PyTorch model."""
+    
+    # Google Drive model details
+    MODEL_GDRIVE_ID = "1HqH15cM_Aye4lWLnO4JjMAapgGmOA6Fl"
+    MODEL_URL = f"https://drive.google.com/uc?id={MODEL_GDRIVE_ID}"
+    MODEL_FILENAME = "deepfake_model.pt"
     
     def __init__(self):
         self.model_version = "DeepFakeNet-v4.1"
-        self.detection_threshold = 0.7
-        self.supported_formats = ["jpg", "jpeg", "png", "bmp", "mp4", "avi", "mov"]
+        self.detection_threshold = 0.5  # >= 0.5 = FAKE, < 0.5 = REAL
+        self.model = None
+        self.device = None
+        self.model_dir = Path(__file__).parent.parent.parent / "models" / "deepfake"
+        self.model_path = self.model_dir / self.MODEL_FILENAME
         
-    def analyze_media(self, media_file: str, media_type: str = "image") -> Dict[str, Any]:
+        # Create model directory
+        self.model_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Load model on init
+        self._initialize_model()
+        
+    def _initialize_model(self):
+        """Initialize PyTorch model and detect device."""
+        global torch, gdown
+        
+        try:
+            # Import torch
+            import torch as torch_module
+            torch = torch_module
+            
+            # Detect device
+            if torch.cuda.is_available():
+                self.device = torch.device("cuda")
+                logger.info("[DEEPFAKE] GPU (CUDA) detected and will be used")
+            else:
+                self.device = torch.device("cpu")
+                logger.info("[DEEPFAKE] No GPU detected, using CPU")
+            
+            # Check if model exists
+            if not self.model_path.exists():
+                logger.info(f"[DEEPFAKE] Model not found at {self.model_path}")
+                self._download_model()
+            else:
+                logger.info(f"[DEEPFAKE] Model found at {self.model_path}")
+            
+            # Load model
+            logger.info("[DEEPFAKE] Loading model weights...")
+            self.model = torch.load(
+                str(self.model_path),
+                map_location=self.device
+            )
+            self.model.eval()  # Set to evaluation mode
+            self.model.to(self.device)
+            
+            logger.info(f"[DEEPFAKE] ✓ Model loaded successfully on {self.device}")
+            
+        except Exception as e:
+            logger.error(f"[DEEPFAKE] ✗ Failed to initialize model: {str(e)}")
+            self.model = None
+    
+    def _download_model(self):
+        """Download model from Google Drive."""
+        global gdown
+        
+        try:
+            import gdown as gdown_module
+            gdown = gdown_module
+            
+            logger.info(f"[DEEPFAKE] Downloading model from Google Drive...")
+            logger.info(f"[DEEPFAKE] URL: {self.MODEL_URL}")
+            logger.info(f"[DEEPFAKE] Destination: {self.model_path}")
+            
+            # Download file
+            gdown.download(
+                self.MODEL_URL,
+                str(self.model_path),
+                quiet=False,
+                fuzzy=True
+            )
+            
+            # Verify download
+            if self.model_path.exists():
+                file_size = self.model_path.stat().st_size / (1024 * 1024)  # MB
+                logger.info(f"[DEEPFAKE] ✓ Model downloaded successfully ({file_size:.2f} MB)")
+            else:
+                raise Exception("Model file not found after download")
+                
+        except ImportError:
+            logger.error("[DEEPFAKE] gdown not installed. Install with: pip install gdown")
+            raise Exception("Cannot download model: gdown not installed")
+        except Exception as e:
+            logger.error(f"[DEEPFAKE] ✗ Model download failed: {str(e)}")
+            raise Exception(f"Model download failed: {str(e)}")
+    
+    def analyze_video(self, video_path: str) -> Dict[str, Any]:
         """
-        Analyze media file for deepfake/synthetic content.
+        Analyze video file for deepfake content.
         
         Args:
-            media_file: Base64 encoded media file or file path
-            media_type: 'image' or 'video'
+            video_path: Path to video file
             
         Returns:
             Dictionary containing analysis results
@@ -36,102 +133,202 @@ class DeepfakeService:
         start_time = time.time()
         
         try:
-            if media_type.lower() == "image":
-                return self._analyze_image(media_file, start_time)
-            elif media_type.lower() == "video":
-                return self._analyze_video(media_file, start_time)
-            else:
-                return self._create_error_response(f"Unsupported media type: {media_type}", start_time)
-                
+            if self.model is None:
+                return self._create_error_response("Model not loaded", start_time)
+            
+            logger.info(f"[DEEPFAKE] Video received: {video_path}")
+            
+            # Extract frames
+            logger.info("[DEEPFAKE] Extracting frames...")
+            frames = self._extract_frames(video_path, max_frames=30, fps=10)
+            
+            if len(frames) == 0:
+                return self._create_error_response("No frames extracted from video", start_time)
+            
+            logger.info(f"[DEEPFAKE] Extracted {len(frames)} frames")
+            
+            # Preprocess frames
+            logger.info("[DEEPFAKE] Preprocessing frames...")
+            processed_frames = [self._preprocess_frame(frame) for frame in frames]
+            
+            # Run inference
+            logger.info("[DEEPFAKE] Running model inference...")
+            predictions = []
+            
+            for idx, frame_tensor in enumerate(processed_frames):
+                with torch.no_grad():
+                    frame_tensor = frame_tensor.to(self.device)
+                    output = self.model(frame_tensor)
+                    
+                    # Get probability (adjust based on model output)
+                    if isinstance(output, torch.Tensor):
+                        if output.shape[-1] == 1:
+                            # Single output (sigmoid)
+                            prob = torch.sigmoid(output).item()
+                        else:
+                            # Binary classification (softmax)
+                            prob = torch.softmax(output, dim=-1)[0][1].item()
+                    else:
+                        prob = float(output)
+                    
+                    predictions.append(prob)
+                    
+                    if (idx + 1) % 10 == 0:
+                        logger.info(f"[DEEPFAKE] Processed {idx + 1}/{len(processed_frames)} frames")
+            
+            # Calculate final score
+            avg_score = float(np.mean(predictions))
+            max_score = float(np.max(predictions))
+            min_score = float(np.min(predictions))
+            std_score = float(np.std(predictions))
+            
+            deepfake_score = avg_score
+            decision = "FAKE" if deepfake_score >= self.detection_threshold else "REAL"
+            
+            processing_time = int((time.time() - start_time) * 1000)
+            
+            logger.info(f"[DEEPFAKE] Inference complete - Score: {deepfake_score:.4f}")
+            logger.info(f"[DEEPFAKE] Decision: {decision}")
+            
+            result = {
+                "deepfake_score": round(deepfake_score * 100, 2),
+                "is_deepfake": decision == "FAKE",
+                "decision": decision,
+                "confidence_level": round(deepfake_score, 4),
+                "frames_analyzed": len(frames),
+                "frame_predictions": [round(p * 100, 2) for p in predictions],
+                "statistics": {
+                    "mean": round(avg_score * 100, 2),
+                    "max": round(max_score * 100, 2),
+                    "min": round(min_score * 100, 2),
+                    "std": round(std_score * 100, 2)
+                },
+                "processing_time_ms": processing_time,
+                "model_version": self.model_version,
+                "device": str(self.device),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+            logger.info("[DEEPFAKE] Analysis complete")
+            return result
+            
         except Exception as e:
+            logger.error(f"[DEEPFAKE] Analysis failed: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
             return self._create_error_response(str(e), start_time)
     
-    def _analyze_image(self, image_data: str, start_time: float) -> Dict[str, Any]:
-        """Analyze single image for deepfake content."""
-        # Decode image
-        image = self._decode_image(image_data)
+    def analyze_image(self, image_data: str) -> Dict[str, Any]:
+        """
+        Analyze single image for deepfake content.
         
-        # Run multiple detection algorithms
-        face_analysis = self._analyze_face_authenticity(image)
-        artifact_detection = self._detect_generation_artifacts(image)
-        consistency_check = self._check_pixel_consistency(image)
-        frequency_analysis = self._analyze_frequency_domain(image)
-        
-        # Calculate overall deepfake probability
-        deepfake_score = self._calculate_deepfake_score(
-            face_analysis, artifact_detection, consistency_check, frequency_analysis
-        )
-        
-        processing_time = int((time.time() - start_time) * 1000)
-        
-        return {
-            "deepfake_score": deepfake_score,
-            "is_deepfake": deepfake_score > (self.detection_threshold * 100),
-            "confidence_level": min(deepfake_score / 100.0, 1.0),
-            "analysis_details": {
-                "face_authenticity": face_analysis,
-                "generation_artifacts": artifact_detection,
-                "pixel_consistency": consistency_check,
-                "frequency_analysis": frequency_analysis
-            },
-            "media_type": "image",
-            "frames_analyzed": 1,
-            "processing_time_ms": processing_time,
-            "model_version": self.model_version,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    
-    def _analyze_video(self, video_data: str, start_time: float) -> Dict[str, Any]:
-        """Analyze video file for deepfake content."""
-        # Simulate video analysis (in production, would extract and analyze frames)
-        frames_analyzed = np.random.randint(10, 30)
-        
-        # Simulate frame-by-frame analysis
-        frame_scores = []
-        temporal_inconsistencies = []
-        
-        for frame_idx in range(frames_analyzed):
-            # Simulate individual frame analysis
-            frame_score = np.random.uniform(10, 95)
-            frame_scores.append(frame_score)
+        Args:
+            image_data: Base64 encoded image
             
-            # Check for temporal inconsistencies
-            if frame_idx > 0:
-                temporal_diff = abs(frame_score - frame_scores[frame_idx - 1])
-                if temporal_diff > 20:  # Sudden change indicates manipulation
-                    temporal_inconsistencies.append({
-                        "frame": frame_idx,
-                        "score_difference": temporal_diff
-                    })
+        Returns:
+            Dictionary containing analysis results
+        """
+        start_time = time.time()
         
-        # Calculate overall video deepfake score
-        avg_frame_score = np.mean(frame_scores)
-        temporal_penalty = len(temporal_inconsistencies) * 5  # Penalty for inconsistencies
-        deepfake_score = min(100, avg_frame_score + temporal_penalty)
+        try:
+            if self.model is None:
+                return self._create_error_response("Model not loaded", start_time)
+            
+            logger.info("[DEEPFAKE] Image received")
+            
+            # Decode image
+            image = self._decode_image(image_data)
+            
+            # Preprocess
+            processed_frame = self._preprocess_frame(image)
+            
+            # Run inference
+            logger.info("[DEEPFAKE] Running model inference...")
+            with torch.no_grad():
+                processed_frame = processed_frame.to(self.device)
+                output = self.model(processed_frame)
+                
+                # Get probability
+                if isinstance(output, torch.Tensor):
+                    if output.shape[-1] == 1:
+                        prob = torch.sigmoid(output).item()
+                    else:
+                        prob = torch.softmax(output, dim=-1)[0][1].item()
+                else:
+                    prob = float(output)
+            
+            deepfake_score = float(prob)
+            decision = "FAKE" if deepfake_score >= self.detection_threshold else "REAL"
+            
+            processing_time = int((time.time() - start_time) * 1000)
+            
+            logger.info(f"[DEEPFAKE] Inference complete - Score: {deepfake_score:.4f}, Decision: {decision}")
+            
+            return {
+                "deepfake_score": round(deepfake_score * 100, 2),
+                "is_deepfake": decision == "FAKE",
+                "decision": decision,
+                "confidence_level": round(deepfake_score, 4),
+                "frames_analyzed": 1,
+                "processing_time_ms": processing_time,
+                "model_version": self.model_version,
+                "device": str(self.device),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"[DEEPFAKE] Analysis failed: {str(e)}")
+            return self._create_error_response(str(e), start_time)
+    
+    def _extract_frames(self, video_path: str, max_frames: int = 30, fps: int = 10) -> List[np.ndarray]:
+        """Extract frames from video."""
+        frames = []
+        cap = cv2.VideoCapture(video_path)
         
-        # Motion and behavioral analysis
-        motion_analysis = self._analyze_motion_patterns(frames_analyzed)
-        lip_sync_analysis = self._analyze_lip_sync(frames_analyzed)
+        if not cap.isOpened():
+            logger.error("[DEEPFAKE] Failed to open video file")
+            return frames
         
-        processing_time = int((time.time() - start_time) * 1000)
+        video_fps = cap.get(cv2.CAP_PROP_FPS)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
-        return {
-            "deepfake_score": round(deepfake_score, 2),
-            "is_deepfake": deepfake_score > (self.detection_threshold * 100),
-            "confidence_level": round(min(deepfake_score / 100.0, 1.0), 2),
-            "video_analysis": {
-                "frames_analyzed": frames_analyzed,
-                "frame_scores": [round(score, 2) for score in frame_scores],
-                "temporal_inconsistencies": temporal_inconsistencies,
-                "motion_analysis": motion_analysis,
-                "lip_sync_analysis": lip_sync_analysis
-            },
-            "media_type": "video",
-            "frames_analyzed": frames_analyzed,
-            "processing_time_ms": processing_time,
-            "model_version": self.model_version,
-            "timestamp": datetime.utcnow().isoformat()
-        }
+        # Calculate frame interval
+        if total_frames > max_frames:
+            interval = total_frames // max_frames
+        else:
+            interval = 1
+        
+        frame_idx = 0
+        while cap.isOpened() and len(frames) < max_frames:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            if frame_idx % interval == 0:
+                # Convert BGR to RGB
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frames.append(frame_rgb)
+            
+            frame_idx += 1
+        
+        cap.release()
+        logger.info(f"[DEEPFAKE] Extracted {len(frames)} frames from {total_frames} total frames")
+        
+        return frames
+    
+    def _preprocess_frame(self, frame: np.ndarray) -> torch.Tensor:
+        """Preprocess frame for model input."""
+        # Resize to model input size (adjust based on model requirements)
+        frame_resized = cv2.resize(frame, (224, 224))
+        
+        # Normalize to [0, 1]
+        frame_normalized = frame_resized.astype('float32') / 255.0
+        
+        # Convert to tensor and add batch dimension
+        # Shape: (1, H, W, C) -> (1, C, H, W)
+        frame_tensor = torch.from_numpy(frame_normalized).permute(2, 0, 1).unsqueeze(0)
+        
+        return frame_tensor
     
     def _decode_image(self, image_data: str) -> np.ndarray:
         """Decode base64 image to numpy array."""
@@ -140,169 +337,7 @@ class DeepfakeService:
         
         image_bytes = base64.b64decode(image_data)
         image = Image.open(io.BytesIO(image_bytes))
-        return np.array(image)
-    
-    def _analyze_face_authenticity(self, image: np.ndarray) -> Dict[str, Any]:
-        """Analyze facial features for signs of synthesis."""
-        # Simulate advanced face authenticity analysis
-        
-        facial_landmarks_consistent = np.random.random() > 0.15
-        skin_texture_natural = np.random.random() > 0.12
-        eye_reflections_correct = np.random.random() > 0.08
-        facial_geometry_valid = np.random.random() > 0.10
-        
-        authenticity_indicators = {
-            "landmark_consistency": facial_landmarks_consistent,
-            "skin_texture_natural": skin_texture_natural,
-            "eye_reflections": eye_reflections_correct,
-            "facial_geometry": facial_geometry_valid
-        }
-        
-        authenticity_score = sum(authenticity_indicators.values()) / len(authenticity_indicators) * 100
-        
-        return {
-            "authenticity_score": round(authenticity_score, 2),
-            "indicators": authenticity_indicators,
-            "suspicious_regions": self._identify_suspicious_regions() if authenticity_score < 70 else []
-        }
-    
-    def _detect_generation_artifacts(self, image: np.ndarray) -> Dict[str, Any]:
-        """Detect artifacts typical of AI-generated content."""
-        # Simulate artifact detection
-        
-        compression_artifacts = np.random.random() < 0.08
-        blending_artifacts = np.random.random() < 0.12
-        noise_patterns = np.random.random() < 0.15
-        color_inconsistencies = np.random.random() < 0.10
-        
-        artifacts_detected = {
-            "compression_artifacts": compression_artifacts,
-            "blending_artifacts": blending_artifacts,
-            "unusual_noise_patterns": noise_patterns,
-            "color_inconsistencies": color_inconsistencies
-        }
-        
-        artifact_score = (1 - sum(artifacts_detected.values()) / len(artifacts_detected)) * 100
-        
-        return {
-            "artifact_score": round(artifact_score, 2),
-            "artifacts_found": artifacts_detected,
-            "artifact_count": sum(artifacts_detected.values())
-        }
-    
-    def _check_pixel_consistency(self, image: np.ndarray) -> Dict[str, Any]:
-        """Check for pixel-level inconsistencies."""
-        # Simulate pixel consistency analysis
-        
-        edge_consistency = np.random.uniform(0.7, 0.98)
-        gradient_smoothness = np.random.uniform(0.65, 0.95)
-        histogram_distribution = np.random.uniform(0.6, 0.9)
-        
-        consistency_score = (edge_consistency + gradient_smoothness + histogram_distribution) / 3 * 100
-        
-        return {
-            "consistency_score": round(consistency_score, 2),
-            "edge_consistency": round(edge_consistency, 3),
-            "gradient_smoothness": round(gradient_smoothness, 3),
-            "histogram_natural": round(histogram_distribution, 3)
-        }
-    
-    def _analyze_frequency_domain(self, image: np.ndarray) -> Dict[str, Any]:
-        """Analyze frequency domain characteristics."""
-        # Simulate frequency domain analysis
-        
-        frequency_anomalies = np.random.random() < 0.12
-        spectral_signature_natural = np.random.random() > 0.08
-        high_freq_preservation = np.random.uniform(0.6, 0.95)
-        
-        frequency_score = (spectral_signature_natural * 0.4 + 
-                         (not frequency_anomalies) * 0.3 + 
-                         high_freq_preservation * 0.3) * 100
-        
-        return {
-            "frequency_score": round(frequency_score, 2),
-            "anomalies_detected": frequency_anomalies,
-            "spectral_signature_natural": spectral_signature_natural,
-            "high_frequency_preserved": round(high_freq_preservation, 3)
-        }
-    
-    def _analyze_motion_patterns(self, frames_count: int) -> Dict[str, Any]:
-        """Analyze motion patterns in video for unnaturalness."""
-        # Simulate motion analysis
-        
-        motion_smoothness = np.random.uniform(0.7, 0.95)
-        head_movement_natural = np.random.random() > 0.1
-        micro_expressions_present = np.random.random() > 0.15
-        
-        return {
-            "motion_smoothness": round(motion_smoothness, 3),
-            "head_movement_natural": head_movement_natural,
-            "micro_expressions": micro_expressions_present,
-            "motion_score": round((motion_smoothness + head_movement_natural * 0.3 + 
-                                 micro_expressions_present * 0.2) / 1.5 * 100, 2)
-        }
-    
-    def _analyze_lip_sync(self, frames_count: int) -> Dict[str, Any]:
-        """Analyze lip synchronization with audio (if present)."""
-        # Simulate lip-sync analysis
-        
-        has_audio = np.random.random() > 0.3
-        lip_sync_accuracy = np.random.uniform(0.8, 0.98) if has_audio else None
-        
-        return {
-            "has_audio": has_audio,
-            "lip_sync_accuracy": round(lip_sync_accuracy, 3) if lip_sync_accuracy else None,
-            "sync_score": round(lip_sync_accuracy * 100, 2) if lip_sync_accuracy else None
-        }
-    
-    def _identify_suspicious_regions(self) -> List[Dict[str, Any]]:
-        """Identify regions in the image that appear suspicious."""
-        # Simulate suspicious region detection
-        regions = []
-        
-        if np.random.random() < 0.3:  # 30% chance of suspicious region
-            regions.append({
-                "region": "face_boundary",
-                "coordinates": [120, 100, 200, 180],  # x, y, width, height
-                "confidence": round(np.random.uniform(0.6, 0.9), 2),
-                "reason": "Blending artifacts detected"
-            })
-        
-        if np.random.random() < 0.2:  # 20% chance of another region
-            regions.append({
-                "region": "eye_area",
-                "coordinates": [140, 120, 50, 30],
-                "confidence": round(np.random.uniform(0.5, 0.8), 2),
-                "reason": "Unnatural eye reflections"
-            })
-        
-        return regions
-    
-    def _calculate_deepfake_score(self, face_analysis: Dict, artifact_detection: Dict, 
-                                consistency_check: Dict, frequency_analysis: Dict) -> float:
-        """Calculate overall deepfake probability score."""
-        # Weighted scoring (higher score = more likely to be deepfake)
-        weights = {
-            "face_authenticity": 0.35,
-            "artifacts": 0.25,
-            "consistency": 0.25,
-            "frequency": 0.15
-        }
-        
-        # Invert scores where higher = more authentic
-        face_fake_score = 100 - face_analysis["authenticity_score"]
-        artifact_fake_score = 100 - artifact_detection["artifact_score"]
-        consistency_fake_score = 100 - consistency_check["consistency_score"]
-        frequency_fake_score = 100 - frequency_analysis["frequency_score"]
-        
-        total_score = (
-            face_fake_score * weights["face_authenticity"] +
-            artifact_fake_score * weights["artifacts"] +
-            consistency_fake_score * weights["consistency"] +
-            frequency_fake_score * weights["frequency"]
-        )
-        
-        return round(total_score, 2)
+        return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
     
     def _create_error_response(self, error_message: str, start_time: float) -> Dict[str, Any]:
         """Create standardized error response."""
@@ -312,6 +347,7 @@ class DeepfakeService:
             "error": error_message,
             "deepfake_score": 0.0,
             "is_deepfake": False,
+            "decision": "ERROR",
             "confidence_level": 0.0,
             "processing_time_ms": processing_time
         }
@@ -321,7 +357,10 @@ class DeepfakeService:
         return {
             "model_version": self.model_version,
             "detection_threshold": self.detection_threshold,
-            "supported_formats": self.supported_formats,
-            "max_file_size": "50MB",
+            "model_loaded": self.model is not None,
+            "device": str(self.device) if self.device else "not initialized",
+            "model_path": str(self.model_path),
+            "supported_formats": ["mp4", "avi", "mov", "jpg", "jpeg", "png"],
+            "max_file_size": "100MB",
             "recommended_resolution": "720p minimum for video"
         }

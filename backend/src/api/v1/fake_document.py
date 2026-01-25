@@ -142,7 +142,7 @@ async def get_fake_document_result(
 async def upload_document_file(
     file: UploadFile = File(...),
     document_type: Optional[str] = None,
-    current_user: dict = Depends(get_current_active_user)
+    current_user: Optional[dict] = Depends(get_current_active_user)  # Make optional
 ):
     """
     Upload document file for analysis with live progress logging.
@@ -204,29 +204,31 @@ async def upload_document_file(
             )
         
         logger.info(f"[FORGERY] Analysis complete - Score: {analysis_result.get('forgery_score', 0)}")
-        logger.info(f"[DB] Saving results to database...")
         
-        # Create session and store results
-        try:
-            session = await prisma.verificationSession.create({
-                "userId": current_user["id"],
-                "documentPath": file.filename,
-                "forgeryScore": analysis_result.get("forgery_score", 0.0),
-                "decision": "APPROVED" if analysis_result.get("is_authentic", False) else "REJECTED"
-            })
-            session_id = session["id"]
-            
-            await prisma.featureResult.create({
-                "sessionId": session_id,
-                "featureName": "fake_document",
-                "score": analysis_result.get("forgery_score", 0.0),
-                "metadata": analysis_result
-            })
-            
-            logger.info(f"[DB] Results saved successfully - Session ID: {session_id}")
-        except Exception as db_error:
-            logger.error(f"[DB] Database error: {str(db_error)}")
-            # Continue even if DB fails
+        # Only save to DB if user is authenticated
+        if current_user:
+            logger.info(f"[DB] Saving results to database...")
+            try:
+                session = await prisma.verificationSession.create({
+                    "userId": current_user["id"],
+                    "documentPath": file.filename,
+                    "forgeryScore": analysis_result.get("forgery_score", 0.0),
+                    "decision": "APPROVED" if analysis_result.get("is_authentic", False) else "REJECTED"
+                })
+                session_id = session["id"]
+                
+                await prisma.featureResult.create({
+                    "sessionId": session_id,
+                    "featureName": "fake_document",
+                    "score": analysis_result.get("forgery_score", 0.0),
+                    "metadata": analysis_result
+                })
+                
+                logger.info(f"[DB] Results saved successfully - Session ID: {session_id}")
+            except Exception as db_error:
+                logger.error(f"[DB] Database error: {str(db_error)}")
+        else:
+            logger.info(f"[DEMO] Running in demo mode (no user authentication)")
         
         logger.info(f"[DONE] Response sent - Processing time: {analysis_result.get('processing_time_ms', 0)} ms")
         
@@ -272,7 +274,7 @@ async def upload_document_file(
                 "error": f"Internal server error: {str(e)}"
             }
         )
-
+    
 @router.get("/info")
 async def get_service_info():
     """

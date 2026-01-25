@@ -497,6 +497,23 @@ model VerificationSession {
   @@map("verification_sessions")
 }
 
+model DeepfakeResult {
+  id          String   @id @default(cuid())
+  sessionId   String
+  score       Float
+  decision    String   // REAL or FAKE
+  modelVersion String
+  framesAnalyzed Int?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  
+  session     VerificationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([decision])
+  @@map("deepfake_results")
+}
+
 model FeatureResult {
   id            String              @id @default(cuid())
   sessionId     String

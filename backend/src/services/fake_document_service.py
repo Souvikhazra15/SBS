@@ -1,25 +1,70 @@
 """
 Fake Document Detection Service
 
-Advanced algorithms to detect fraudulent, expired, or altered government-issued documents.
-Uses computer vision and machine learning models trained on millions of document samples.
+Advanced computer vision algorithms to detect fraudulent, expired, or altered documents.
+Uses real OCR, tampering detection (ELA), text forensics, and security feature analysis.
 """
 
 import base64
 import io
-import json
 import time
+import logging
 from typing import Dict, Any, Optional, Tuple
-from PIL import Image
-import numpy as np
 from datetime import datetime
 
+import cv2
+import numpy as np
+from PIL import Image
+from scipy import ndimage
+from skimage import feature
+from skimage.filters import sobel
+from paddleocr import PaddleOCR
+
+logger = logging.getLogger(__name__)
+
+
 class FakeDocumentService:
-    """Service for detecting fake or altered documents using AI/ML models."""
+    """Service for detecting fake or altered documents using real CV/ML models."""
     
     def __init__(self):
-        self.model_version = "v2.1.0"
+        self.model_version = "v3.0.0"
         self.confidence_threshold = 0.85
+        
+        # Initialize PaddleOCR (loads model once)
+        logger.info("[INIT] Loading PaddleOCR model...")
+        try:
+            self.ocr_engine = PaddleOCR(
+                use_angle_cls=True,
+                lang='en'
+            )
+            logger.info("[INIT] ✓ PaddleOCR loaded successfully")
+        except Exception as e:
+            logger.error(f"[INIT] ✗ Failed to load PaddleOCR: {str(e)}")
+            self.ocr_engine = None
+
+        # CNN model placeholder (load pre-trained model if available)
+        self.cnn_model = None
+        self._load_cnn_model()
+        
+        # Configuration for scoring weights
+        self.weights = {
+            "tampering": 0.30,
+            "text_forensics": 0.25,
+            "ocr_confidence": 0.20,
+            "security_features": 0.15,
+            "hologram": 0.10
+        }
+    
+    def _load_cnn_model(self):
+        """Load CNN model for security feature detection (graceful fallback)."""
+        try:
+            # Placeholder for CNN model loading
+            # In production: load EfficientNet/ResNet checkpoint
+            logger.info("[INIT] CNN model not configured (optional)")
+            self.cnn_model = None
+        except Exception as e:
+            logger.warning(f"[INIT] CNN model unavailable: {str(e)}")
+            self.cnn_model = None
         
     def analyze_document(self, document_image: str, document_type: Optional[str] = None) -> Dict[str, Any]:
         """
