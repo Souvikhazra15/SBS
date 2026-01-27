@@ -16,14 +16,14 @@ const features = [
     title: 'Identity Verification',
     description: 'Verify user identity through government-issued documents with advanced liveness detection and biometric matching.',
     highlights: ['Liveness Detection', 'Facial Recognition', 'Global Documents'],
-    sections: ['Fake Document Detection', 'Face Matching', 'Deepfake Detection', 'Risk Scoring'],
+    sections: ['Fake Document Detection', 'Face Matching', 'Deepfake Detection', 'e-KYC'],
   },
   {
     icon: ZapIcon,
     title: 'Fraud Prevention',
     description: 'Real-time threat detection using machine learning models to identify suspicious patterns and prevent synthetic fraud.',
-    highlights: ['Real-time Analysis', 'Behavioral Detection', 'Risk Scoring'],
-    sections: ['Risk Scoring', 'Manual Review', 'Explainable Results', 'Secure & Scalable System'],
+    highlights: ['Real-time Analysis', 'Behavioral Detection', 'e-KYC Verification'],
+    sections: ['e-KYC', 'Manual Review', 'Explainable Results', 'Secure & Scalable System'],
   },
   {
     icon: CheckCircleIcon,
@@ -37,7 +37,7 @@ const features = [
     title: 'Document OCR',
     description: 'Intelligent document capture and extraction with support for 100+ document types across all major countries.',
     highlights: ['Multi-language', 'Automatic Extraction', 'Quality Validation'],
-    sections: ['Fake Document Detection', 'Risk Scoring', 'Explainable Results', 'Secure & Scalable System'],
+    sections: ['Fake Document Detection', 'e-KYC', 'Explainable Results', 'Secure & Scalable System'],
   },
 ]
 
@@ -58,9 +58,9 @@ const verificationMethods = [
     features: ['Video Detection', 'Synthetic Media', 'Behavioral Analysis'],
   },
   {
-    title: 'Risk Scoring',
-    description: 'Intelligent risk assessment evaluates verification confidence and fraud likelihood.',
-    features: ['ML-Based Calculation', 'Customizable Thresholds', 'Continuous Learning'],
+    title: 'e-KYC',
+    description: 'Complete e-KYC verification with document authentication, face matching, and liveness detection.',
+    features: ['Document Authentication', 'Face Matching', 'Liveness Detection'],
   },
 ]
 
@@ -87,9 +87,9 @@ const allDetailedSections = [
         features: ['Video Fraud Detection', 'Synthetic Media Analysis', 'Real-time Behavioral Analysis', 'AI-Powered Alerts'],
       },
       {
-        title: 'Risk Scoring',
-        description: 'Intelligent risk assessment evaluates verification confidence levels.',
-        features: ['ML-Based Risk Calculation', 'Customizable Thresholds', 'Historical Pattern Analysis', 'Continuous Learning Model'],
+        title: 'e-KYC',
+        description: 'Complete e-KYC verification solution with multi-layer authentication.',
+        features: ['Document Authentication', 'Face Matching', 'Liveness Detection', 'Real-time Results'],
       },
     ],
   },
