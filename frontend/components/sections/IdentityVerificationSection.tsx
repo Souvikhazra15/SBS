@@ -24,15 +24,15 @@ const verificationFeatures = [
   },
   {
     icon: CheckCircleIcon,
-    title: 'Face Matching',
-    description: 'Cutting-edge facial recognition technology matches faces with government documents.',
+    title: 'Video-KYC',
+    description: 'Real-time video verification with AI-powered identity authentication and live agent support.',
     features: [
-      'Liveness Detection',
-      '3D Face Recognition',
-      'Anti-Spoofing Technology',
-      'High Accuracy Matching',
+      'Live Video Verification',
+      'Real-time Document Validation',
+      'Agent-Assisted KYC',
+      'Instant Approval System',
     ],
-    href: '/features/face-matching',
+    href: '/video-kyc',
   },
   {
     icon: ShieldVerifyIcon,
