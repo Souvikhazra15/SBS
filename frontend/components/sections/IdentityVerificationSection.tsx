@@ -48,15 +48,15 @@ const verificationFeatures = [
   },
   {
     icon: CheckCircleIcon,
-    title: 'Risk Scoring',
-    description: 'Intelligent risk assessment algorithm evaluates verification confidence and fraud likelihood.',
+    title: 'e-KYC',
+    description: 'Complete e-KYC verification solution with document authentication, face matching, and liveness detection.',
     features: [
-      'ML-Based Risk Calculation',
-      'Customizable Thresholds',
-      'Historical Data Analysis',
-      'Continuous Learning',
+      'Document Authentication',
+      'Face Matching',
+      'Liveness Detection',
+      'Real-time Verification',
     ],
-    href: '/features/risk-scoring',
+    href: '/features/e-kyc',
   },
 ]
 

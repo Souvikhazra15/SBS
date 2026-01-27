@@ -11,7 +11,7 @@ export function IdentityVerificationDetails({ onClose }: IdentityVerificationDet
     { id: 'fake-document-detection', label: 'Fake Document Detection' },
     { id: 'face-matching', label: 'Face Matching' },
     { id: 'deepfake-detection', label: 'Deepfake Detection' },
-    { id: 'risk-scoring', label: 'Risk Scoring' },
+    { id: 'e-kyc', label: 'e-KYC' },
   ]
 
   return (
