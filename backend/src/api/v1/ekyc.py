@@ -17,7 +17,7 @@ from src.schemas.ekyc import (
 )
 from src.services.ekyc_service import EkycService
 from src.utils.auth import get_current_user
-from src.config.prisma import prisma
+from src.config.prisma import get_db_pool
 
 router = APIRouter(prefix="/e-kyc", tags=["E-KYC"])
 logger = logging.getLogger(__name__)
@@ -36,7 +36,8 @@ async def start_ekyc_session(
     The session will be tied to the authenticated user.
     """
     try:
-        service = EkycService(prisma)
+        db_pool = get_db_pool()
+        service = EkycService(db_pool)
         
         session = await service.create_session(
             user_id=current_user["id"],
@@ -44,7 +45,7 @@ async def start_ekyc_session(
             user_agent=None,  # Can be extracted from request
         )
         
-        logger.info(f"[EKYC] Session created: {session.sessionId} for user: {current_user['id']}")
+        logger.info(f"[EKYC] Session created: {session['sessionId']} for user: {current_user['id']}")
         
         return session
         
@@ -76,11 +77,12 @@ async def upload_document(
     Returns uploaded document details.
     """
     try:
-        service = EkycService(prisma)
+        db_pool = get_db_pool()
+        service = EkycService(db_pool)
         
         # Verify session belongs to user
         session = await service.get_session(session_id)
-        if not session or session.userId != current_user["id"]:
+        if not session or session['userId'] != current_user["id"]:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Session not found or access denied"
@@ -94,7 +96,7 @@ async def upload_document(
         logger.info(f"[EKYC] Document uploaded for session: {session_id}")
         
         document = await service.upload_document(
-            session_id=session.id,
+            session_id=session['id'],
             document_type=document_type,
             front_image_url=front_url,
             back_image_url=back_url,
@@ -103,7 +105,7 @@ async def upload_document(
         return {
             "success": True,
             "message": "Document uploaded successfully",
-            "document_id": document.id,
+            "document_id": document['id'],
             "session_id": session_id,
         }
         
@@ -133,11 +135,12 @@ async def upload_selfie(
     Returns upload confirmation.
     """
     try:
-        service = EkycService(prisma)
+        db_pool = get_db_pool()
+        service = EkycService(db_pool)
         
         # Verify session belongs to user
         session = await service.get_session(session_id)
-        if not session or session.userId != current_user["id"]:
+        if not session or session['userId'] != current_user["id"]:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Session not found or access denied"
@@ -149,7 +152,7 @@ async def upload_selfie(
         logger.info(f"[EKYC] Selfie uploaded for session: {session_id}")
         
         await service.upload_selfie(
-            session_id=session.id,
+            session_id=session['id'],
             selfie_url=selfie_url,
         )
         
@@ -188,11 +191,12 @@ async def run_ekyc_verification(
     - Final decision (APPROVED/REJECTED/REVIEW_REQUIRED)
     """
     try:
-        service = EkycService(prisma)
+        db_pool = get_db_pool()
+        service = EkycService(db_pool)
         
         # Verify session belongs to user
         session = await service.get_session(request.session_id)
-        if not session or session.userId != current_user["id"]:
+        if not session or session['userId'] != current_user["id"]:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Session not found or access denied"
@@ -200,7 +204,7 @@ async def run_ekyc_verification(
         
         logger.info(f"[EKYC] Running verification for session: {request.session_id}")
         
-        result = await service.run_verification(session.id)
+        result = await service.run_verification(session['id'])
         
         return result
         
@@ -228,7 +232,8 @@ async def get_ekyc_session(
     Returns session with all documents and verification results.
     """
     try:
-        service = EkycService(prisma)
+        db_pool = get_db_pool()
+        service = EkycService(db_pool)
         
         session = await service.get_session(session_id)
         
@@ -239,7 +244,7 @@ async def get_ekyc_session(
             )
         
         # Verify user owns this session
-        if session.userId != current_user["id"]:
+        if session['userId'] != current_user["id"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
@@ -273,7 +278,8 @@ async def get_my_ekyc_history(
     Returns paginated list of user's e-KYC sessions.
     """
     try:
-        service = EkycService(prisma)
+        db_pool = get_db_pool()
+        service = EkycService(db_pool)
         
         skip = (page - 1) * page_size
         
