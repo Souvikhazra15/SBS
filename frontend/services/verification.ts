@@ -76,6 +76,108 @@ export interface RiskScoringResult {
   recommendation: string
 }
 
+// ============================================
+// VIDEO KYC INTERFACES
+// ============================================
+
+export interface VideoKYCSession {
+  id: string
+  userId: string
+  sessionStatus: 'IDLE' | 'IN_PROGRESS' | 'DOCUMENT_VERIFICATION' | 'AI_ANALYSIS' | 'AGENT_REVIEW' | 'COMPLETED' | 'REJECTED' | 'EXPIRED'
+  currentStep: number
+  totalSteps: number
+  name?: string
+  dateOfBirth?: string
+  address?: string
+  income?: string
+  employment?: string
+  aadhar?: string
+  pan?: string
+  profileImagePath?: string
+  signatureImagePath?: string
+  documentImagePath?: string
+  documentVerified: boolean
+  faceMatched: boolean
+  livenessChecked: boolean
+  riskScore?: number
+  forgeryScore?: number
+  faceMatchScore?: number
+  deepfakeScore?: number
+  finalDecision: 'PENDING' | 'APPROVED' | 'REJECTED' | 'MANUAL_REVIEW'
+  sessionStartedAt: string
+  sessionCompletedAt?: string
+}
+
+export interface VideoKYCSessionData {
+  name?: string
+  dateOfBirth?: string
+  address?: string
+  income?: string
+  employment?: string
+  aadhar?: string
+  pan?: string
+  currentStep?: number
+}
+
+export interface VideoKYCFileUploadResponse {
+  success: boolean
+  sessionId: string
+  filePath: string
+  fileType: string
+  message: string
+}
+
+export interface VideoKYCAnswerResponse {
+  id: string
+  sessionId: string
+  questionId: string
+  answerText?: string
+  answerType: string
+  imageUrl?: string
+  audioUrl?: string
+  isValid: boolean
+  validationErrors?: Record<string, any>
+  answeredAt: string
+  responseTime?: number
+}
+
+export interface VideoKYCChatMessageResponse {
+  id: string
+  sessionId: string
+  messageText: string
+  messageType: string
+  timestamp: string
+}
+
+export interface VideoKYCAIAnalysisResponse {
+  success: boolean
+  sessionId: string
+  documentVerified: boolean
+  faceMatched: boolean
+  livenessChecked: boolean
+  forgeryScore?: number
+  faceMatchScore?: number
+  deepfakeScore?: number
+  riskScore?: number
+  recommendation: string
+  details: Record<string, any>
+}
+
+export interface VideoKYCSessionCompleteResponse {
+  success: boolean
+  sessionId: string
+  finalDecision: 'APPROVED' | 'REJECTED' | 'MANUAL_REVIEW'
+  message: string
+  session: VideoKYCSession
+}
+
+export interface VideoKYCSessionHistoryResponse {
+  sessions: VideoKYCSession[]
+  total: number
+  page: number
+  pageSize: number
+}
+
 class VerificationService {
   /**
    * Upload a file for verification
@@ -253,6 +355,135 @@ class VerificationService {
    */
   async getVerificationHistory(limit: number = 10): Promise<VerificationSession[]> {
     return apiService.get<VerificationSession[]>(`/api/v1/verification/history?limit=${limit}`)
+  }
+
+  // ============================================
+  // VIDEO KYC METHODS
+  // ============================================
+
+  /**
+   * Create a new Video KYC session
+   */
+  async createVideoKYCSession(): Promise<VideoKYCSession> {
+    return apiService.post<VideoKYCSession>('/api/v1/video-kyc/session/create')
+  }
+
+  /**
+   * Get Video KYC session by ID
+   */
+  async getVideoKYCSession(sessionId: string): Promise<VideoKYCSession> {
+    return apiService.get<VideoKYCSession>(`/api/v1/video-kyc/session/${sessionId}`)
+  }
+
+  /**
+   * Update Video KYC session data
+   */
+  async updateVideoKYCSession(sessionId: string, data: Partial<VideoKYCSessionData>): Promise<VideoKYCSession> {
+    return apiService.put<VideoKYCSession>(`/api/v1/video-kyc/session/${sessionId}/update`, data)
+  }
+
+  /**
+   * Upload image for Video KYC (profile, signature, document)
+   */
+  async uploadVideoKYCImage(
+    sessionId: string,
+    file: File,
+    fileType: 'profile' | 'signature' | 'document',
+    name: string,
+    dob?: string,
+    onProgress?: (progress: number) => void
+  ): Promise<VideoKYCFileUploadResponse> {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('session_id', sessionId)
+    formData.append('file_type', fileType)
+    formData.append('name', name)
+    if (dob) {
+      formData.append('dob', dob)
+    }
+
+    return apiService.post<VideoKYCFileUploadResponse>('/api/v1/video-kyc/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent: any) => {
+        if (onProgress && progressEvent.total) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          onProgress(progress)
+        }
+      },
+    })
+  }
+
+  /**
+   * Submit an answer to a Video KYC question
+   */
+  async submitVideoKYCAnswer(
+    sessionId: string,
+    questionId: string,
+    answerText: string,
+    answerType: string = 'text',
+    responseTime?: number
+  ): Promise<VideoKYCAnswerResponse> {
+    return apiService.post<VideoKYCAnswerResponse>('/api/v1/video-kyc/answer/submit', {
+      sessionId,
+      questionId,
+      answerText,
+      answerType,
+      responseTime,
+    })
+  }
+
+  /**
+   * Add a chat message to Video KYC session
+   */
+  async addVideoKYCChatMessage(
+    sessionId: string,
+    messageText: string,
+    messageType: 'agent' | 'user' | 'system'
+  ): Promise<VideoKYCChatMessageResponse> {
+    return apiService.post<VideoKYCChatMessageResponse>('/api/v1/video-kyc/chat/message', {
+      sessionId,
+      messageText,
+      messageType,
+    })
+  }
+
+  /**
+   * Run AI analysis on Video KYC session
+   */
+  async runVideoKYCAIAnalysis(sessionId: string): Promise<VideoKYCAIAnalysisResponse> {
+    return apiService.post<VideoKYCAIAnalysisResponse>('/api/v1/video-kyc/analysis/run', {
+      sessionId,
+    })
+  }
+
+  /**
+   * Complete Video KYC session with final decision
+   */
+  async completeVideoKYCSession(
+    sessionId: string,
+    finalDecision: 'APPROVED' | 'REJECTED' | 'MANUAL_REVIEW',
+    agentName?: string,
+    agentReviewNotes?: string,
+    rejectionReason?: string
+  ): Promise<VideoKYCSessionCompleteResponse> {
+    return apiService.post<VideoKYCSessionCompleteResponse>('/api/v1/video-kyc/session/complete', {
+      sessionId,
+      finalDecision,
+      agentName,
+      agentReviewNotes,
+      rejectionReason,
+    })
+  }
+
+  /**
+   * Get Video KYC session history
+   */
+  async getVideoKYCHistory(limit: number = 10, page: number = 1): Promise<VideoKYCSessionHistoryResponse> {
+    return apiService.get<VideoKYCSessionHistoryResponse>(
+      `/api/v1/video-kyc/session/history?limit=${limit}&page=${page}`
+    )
   }
 }
 

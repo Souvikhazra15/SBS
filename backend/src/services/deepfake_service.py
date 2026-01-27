@@ -5,6 +5,7 @@ Uses trained CNN/LSTM model for detecting deepfakes in videos and images.
 Auto-downloads model from Google Drive if not present.
 """
 
+from __future__ import annotations
 import base64
 import io
 import time
@@ -13,11 +14,14 @@ import os
 import tempfile
 import hashlib
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, TYPE_CHECKING
 from PIL import Image
 import numpy as np
 import cv2
 from datetime import datetime
+
+if TYPE_CHECKING:
+    import torch
 
 logger = logging.getLogger(__name__)
 

@@ -60,11 +60,10 @@ model User {
   
   // Relations
   sessions          Session[]
-  verifications     Verification[]
-  documents         Document[]
-  auditLogs         AuditLog[]
-  apiKeys           ApiKey[]
   verificationSessions VerificationSession[]
+  videoKycSessions  VideoKYCSession[]
+  sessionActions    SessionAction[]
+  ekycSessions      EkycSession[]
   
   @@index([email])
   @@index([status])
@@ -90,375 +89,6 @@ model Session {
 }
 
 // ============================================
-// KYC VERIFICATION PROCESS
-// ============================================
-
-enum VerificationStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-  REJECTED
-  MANUAL_REVIEW
-  EXPIRED
-}
-
-enum VerificationLevel {
-  BASIC           // Email + Phone
-  STANDARD        // Basic + Document
-  ENHANCED        // Standard + Face Match
-  PREMIUM         // Enhanced + Liveness + AML
-}
-
-enum RiskLevel {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-model Verification {
-  id                    String              @id @default(cuid())
-  userId                String
-  status                VerificationStatus  @default(PENDING)
-  level                 VerificationLevel   @default(STANDARD)
-  riskLevel             RiskLevel?
-  riskScore             Float?              // 0-100
-  
-  // Verification Steps
-  emailVerified         Boolean             @default(false)
-  phoneVerified         Boolean             @default(false)
-  documentVerified      Boolean             @default(false)
-  faceVerified          Boolean             @default(false)
-  livenessVerified      Boolean             @default(false)
-  amlCheckCompleted     Boolean             @default(false)
-  
-  // Metadata
-  startedAt             DateTime            @default(now())
-  completedAt           DateTime?
-  expiresAt             DateTime?
-  reviewedBy            String?
-  reviewedAt            DateTime?
-  rejectionReason       String?
-  
-  // Geolocation
-  ipAddress             String?
-  country               String?
-  region                String?
-  
-  // Relations
-  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  documents             Document[]
-  faceMatches           FaceMatch[]
-  livenessChecks        LivenessCheck[]
-  amlChecks             AMLCheck[]
-  fraudChecks           FraudCheck[]
-  riskAssessments       RiskAssessment[]
-  
-  @@index([userId])
-  @@index([status])
-  @@index([riskLevel])
-  @@map("verifications")
-}
-
-// ============================================
-// DOCUMENT VERIFICATION
-// ============================================
-
-enum DocumentType {
-  PASSPORT
-  DRIVERS_LICENSE
-  NATIONAL_ID
-  RESIDENCE_PERMIT
-  VOTER_ID
-  UTILITY_BILL
-  BANK_STATEMENT
-  OTHER
-}
-
-enum DocumentStatus {
-  PENDING
-  PROCESSING
-  VERIFIED
-  REJECTED
-  EXPIRED
-}
-
-model Document {
-  id                    String          @id @default(cuid())
-  userId                String
-  verificationId        String?
-  type                  DocumentType
-  status                DocumentStatus  @default(PENDING)
-  
-  // Document Details
-  documentNumber        String?
-  issuingCountry        String?
-  issuingAuthority      String?
-  issueDate             DateTime?
-  expiryDate            DateTime?
-  
-  // File Storage
-  frontImageUrl         String
-  backImageUrl          String?
-  faceImageUrl          String?
-  
-  // OCR Extracted Data
-  extractedData         Json?           // Structured data from OCR
-  fullName              String?
-  dateOfBirth           DateTime?
-  gender                String?
-  address               String?
-  
-  // Verification Results
-  isAuthentic           Boolean?
-  confidenceScore       Float?          // 0-100
-  tamperingDetected     Boolean         @default(false)
-  securityFeaturesValid Boolean?
-  
-  // Fraud Detection
-  isFake                Boolean         @default(false)
-  fraudIndicators       Json?
-  
-  // Metadata
-  uploadedAt            DateTime        @default(now())
-  processedAt           DateTime?
-  verifiedAt            DateTime?
-  rejectionReason       String?
-  
-  // Relations
-  user                  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  verification          Verification?   @relation(fields: [verificationId], references: [id])
-  
-  @@index([userId])
-  @@index([verificationId])
-  @@index([status])
-  @@map("documents")
-}
-
-// ============================================
-// FACE VERIFICATION & LIVENESS
-// ============================================
-
-enum FaceMatchStatus {
-  PENDING
-  MATCHED
-  NOT_MATCHED
-  FAILED
-}
-
-model FaceMatch {
-  id                    String           @id @default(cuid())
-  verificationId        String
-  status                FaceMatchStatus  @default(PENDING)
-  
-  // Face Images
-  sourceImageUrl        String           // From document
-  targetImageUrl        String           // Selfie/live capture
-  
-  // Match Results
-  matchScore            Float?           // 0-100
-  isMatch               Boolean?
-  confidenceLevel       Float?
-  
-  // Biometric Data
-  faceDescriptor        Json?            // Face encoding/embedding
-  faceQuality           Float?
-  
-  // Detection Results
-  facesDetected         Int              @default(0)
-  multipleFacesDetected Boolean          @default(false)
-  
-  // Metadata
-  createdAt             DateTime         @default(now())
-  processedAt           DateTime?
-  
-  // Relations
-  verification          Verification     @relation(fields: [verificationId], references: [id], onDelete: Cascade)
-  
-  @@index([verificationId])
-  @@map("face_matches")
-}
-
-enum LivenessStatus {
-  PENDING
-  PASSED
-  FAILED
-  SUSPICIOUS
-}
-
-model LivenessCheck {
-  id                    String          @id @default(cuid())
-  verificationId        String
-  status                LivenessStatus  @default(PENDING)
-  
-  // Check Details
-  videoUrl              String?
-  framesAnalyzed        Int?
-  
-  // Detection Results
-  isLive                Boolean?
-  confidenceScore       Float?          // 0-100
-  
-  // Deepfake Detection
-  deepfakeDetected      Boolean         @default(false)
-  deepfakeScore         Float?
-  syntheticFaceDetected Boolean         @default(false)
-  
-  // Challenge-Response
-  challengeType         String?         // blink, smile, turn_head, etc.
-  challengePassed       Boolean?
-  
-  // Metadata
-  createdAt             DateTime        @default(now())
-  processedAt           DateTime?
-  
-  // Relations
-  verification          Verification    @relation(fields: [verificationId], references: [id], onDelete: Cascade)
-  
-  @@index([verificationId])
-  @@map("liveness_checks")
-}
-
-// ============================================
-// AML & COMPLIANCE CHECKS
-// ============================================
-
-enum AMLStatus {
-  PENDING
-  CLEAR
-  HIT
-  MANUAL_REVIEW
-  FAILED
-}
-
-model AMLCheck {
-  id                    String      @id @default(cuid())
-  verificationId        String
-  status                AMLStatus   @default(PENDING)
-  
-  // Check Details
-  fullName              String
-  dateOfBirth           DateTime?
-  nationality           String?
-  
-  // Screening Results
-  sanctionsHit          Boolean     @default(false)
-  pepHit                Boolean     @default(false)      // Politically Exposed Person
-  adverseMediaHit       Boolean     @default(false)
-  
-  // Match Details
-  matchedEntities       Json?       // List of matched entities
-  matchScore            Float?
-  
-  // Watchlist Sources
-  ofacChecked           Boolean     @default(false)     // US OFAC
-  unChecked             Boolean     @default(false)     // UN Sanctions
-  euChecked             Boolean     @default(false)     // EU Sanctions
-  interpolChecked       Boolean     @default(false)
-  
-  // Metadata
-  createdAt             DateTime    @default(now())
-  completedAt           DateTime?
-  reviewedBy            String?
-  reviewNotes           String?
-  
-  // Relations
-  verification          Verification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
-  
-  @@index([verificationId])
-  @@index([status])
-  @@map("aml_checks")
-}
-
-// ============================================
-// FRAUD DETECTION & RISK SCORING
-// ============================================
-
-enum FraudCheckStatus {
-  PENDING
-  CLEAR
-  SUSPICIOUS
-  FRAUD_DETECTED
-}
-
-model FraudCheck {
-  id                    String            @id @default(cuid())
-  verificationId        String
-  status                FraudCheckStatus  @default(PENDING)
-  
-  // Fraud Indicators
-  ipRiskScore           Float?
-  emailRiskScore        Float?
-  phoneRiskScore        Float?
-  deviceRiskScore       Float?
-  behaviorRiskScore     Float?
-  
-  // Detection Results
-  vpnDetected           Boolean           @default(false)
-  proxyDetected         Boolean           @default(false)
-  emulatorDetected      Boolean           @default(false)
-  suspiciousActivity    Boolean           @default(false)
-  
-  // Geolocation Mismatch
-  ipCountry             String?
-  documentCountry       String?
-  countryMismatch       Boolean           @default(false)
-  
-  // Duplicate Detection
-  duplicateEmail        Boolean           @default(false)
-  duplicatePhone        Boolean           @default(false)
-  duplicateDocument     Boolean           @default(false)
-  duplicateFace         Boolean           @default(false)
-  
-  // Metadata
-  details               Json?             // Additional fraud signals
-  createdAt             DateTime          @default(now())
-  
-  // Relations
-  verification          Verification      @relation(fields: [verificationId], references: [id], onDelete: Cascade)
-  
-  @@index([verificationId])
-  @@map("fraud_checks")
-}
-
-model RiskAssessment {
-  id                    String       @id @default(cuid())
-  verificationId        String
-  
-  // Overall Risk
-  overallRiskScore      Float        // 0-100
-  riskLevel             RiskLevel
-  recommendation        String       // APPROVE, REJECT, MANUAL_REVIEW
-  
-  // Component Scores
-  documentRiskScore     Float?
-  faceRiskScore         Float?
-  amlRiskScore          Float?
-  fraudRiskScore        Float?
-  behaviorRiskScore     Float?
-  
-  // Factors
-  positiveFactors       Json?        // Factors reducing risk
-  negativeFactors       Json?        // Factors increasing risk
-  
-  // Decision
-  autoDecision          Boolean      @default(false)
-  requiresReview        Boolean      @default(false)
-  reviewPriority        String?      // LOW, MEDIUM, HIGH, CRITICAL
-  
-  // Metadata
-  calculatedAt          DateTime     @default(now())
-  modelVersion          String?
-  
-  // Relations
-  verification          Verification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
-  
-  @@index([verificationId])
-  @@index([riskLevel])
-  @@map("risk_assessments")
-}
-
-// ============================================
 // FEATURE-SPECIFIC VERIFICATION SESSIONS
 // ============================================
 
@@ -475,6 +105,10 @@ model VerificationSession {
   documentPath  String?
   selfiePath    String?
   
+  // Session Status & Type
+  status        String              @default("started") // started, running, completed, failed
+  featureType   String?             // deepfake, face_matching, document_verification, etc.
+  
   // Feature Scores
   forgeryScore      Float?          // 0-100 (Fake Document Detection)
   faceMatchScore    Float?          // 0-100 (Face Matching)
@@ -487,14 +121,38 @@ model VerificationSession {
   // Metadata
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+  completedAt       DateTime?
   
   // Relations
   user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   featureResults    FeatureResult[]
+  deepfakeResults   DeepfakeResult[]
+  sessionActions    SessionAction[]
   
   @@index([userId])
   @@index([createdAt])
+  @@index([status])
+  @@index([featureType])
   @@map("verification_sessions")
+}
+
+model SessionAction {
+  id          String   @id @default(cuid())
+  sessionId   String
+  userId      String
+  action      String   // RUN_ANALYSIS, VIEW_RESULT, UPLOAD_FILE, etc.
+  metadata    Json?    // Additional context about the action
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  session     VerificationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
+  @@map("session_actions")
 }
 
 model DeepfakeResult {
@@ -512,6 +170,188 @@ model DeepfakeResult {
   @@index([sessionId])
   @@index([decision])
   @@map("deepfake_results")
+}
+
+// ============================================
+// VIDEO KYC VERIFICATION SYSTEM
+// ============================================
+
+enum VideoKYCStatus {
+  IDLE
+  IN_PROGRESS
+  DOCUMENT_VERIFICATION
+  AI_ANALYSIS
+  AGENT_REVIEW
+  COMPLETED
+  REJECTED
+  EXPIRED
+}
+
+model VideoKYCSession {
+  id                    String            @id @default(cuid())
+  userId                String
+  sessionStatus         VideoKYCStatus    @default(IDLE)
+  
+  // Session Metadata
+  sessionStartedAt      DateTime          @default(now())
+  sessionCompletedAt    DateTime?
+  
+  // Progress Tracking
+  currentStep           Int               @default(0)
+  totalSteps            Int               @default(0)
+  
+  // Collected KYC Data
+  name                  String?
+  dateOfBirth           String?
+  address               String?
+  income                String?
+  employment            String?
+  aadhar                String?
+  pan                   String?
+  
+  // Uploaded Files (stored paths)
+  profileImagePath      String?
+  signatureImagePath    String?
+  documentImagePath     String?
+  
+  // Verification Results
+  documentVerified      Boolean           @default(false)
+  faceMatched           Boolean           @default(false)
+  livenessChecked       Boolean           @default(false)
+  riskScore             Float?
+  
+  // AI Analysis Results
+  forgeryScore          Float?
+  faceMatchScore        Float?
+  deepfakeScore         Float?
+  
+  // Agent Review
+  agentName             String?
+  agentReviewNotes      String?
+  reviewedAt            DateTime?
+  
+  // Final Decision
+  finalDecision         VerificationDecision @default(PENDING)
+  rejectionReason       String?
+  
+  // Geolocation & Device Info
+  ipAddress             String?
+  userAgent             String?
+  deviceInfo            Json?
+  
+  // Relations
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions             VideoKYCQuestion[]
+  answers               VideoKYCAnswer[]
+  verificationResults   VideoKYCVerificationResult[]
+  chatMessages          VideoKYCChatMessage[]
+  
+  @@index([userId])
+  @@index([sessionStatus])
+  @@index([sessionStartedAt])
+  @@map("video_kyc_sessions")
+}
+
+model VideoKYCQuestion {
+  id                    String            @id @default(cuid())
+  sessionId             String
+  
+  // Question Details
+  questionText          String
+  questionType          String            // name, dob, address, income, etc.
+  questionOrder         Int
+  
+  // Validation Rules
+  validationRules       Json?
+  required              Boolean           @default(true)
+  
+  // Metadata
+  askedAt               DateTime          @default(now())
+  
+  // Relations
+  session               VideoKYCSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  answer                VideoKYCAnswer?
+  
+  @@index([sessionId])
+  @@index([questionOrder])
+  @@map("video_kyc_questions")
+}
+
+model VideoKYCAnswer {
+  id                    String            @id @default(cuid())
+  sessionId             String
+  questionId            String            @unique
+  
+  // Answer Details
+  answerText            String?
+  answerType            String            // text, image, audio
+  
+  // Media Storage
+  imageUrl              String?
+  audioUrl              String?
+  
+  // Validation
+  isValid               Boolean           @default(true)
+  validationErrors      Json?
+  
+  // Metadata
+  answeredAt            DateTime          @default(now())
+  responseTime          Int?              // in seconds
+  
+  // Relations
+  session               VideoKYCSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question              VideoKYCQuestion  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([questionId])
+  @@map("video_kyc_answers")
+}
+
+model VideoKYCVerificationResult {
+  id                    String            @id @default(cuid())
+  sessionId             String
+  
+  // Verification Type
+  verificationType      String            // document, face_match, liveness, deepfake, risk
+  
+  // Scores
+  score                 Float
+  confidence            Float?
+  
+  // Results
+  isPassed              Boolean
+  details               Json?
+  
+  // Metadata
+  modelVersion          String?
+  processedAt           DateTime          @default(now())
+  processingTime        Int?              // in milliseconds
+  
+  // Relations
+  session               VideoKYCSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([verificationType])
+  @@map("video_kyc_verification_results")
+}
+
+model VideoKYCChatMessage {
+  id                    String            @id @default(cuid())
+  sessionId             String
+  
+  // Message Details
+  messageText           String
+  messageType           String            // agent, user, system
+  
+  // Metadata
+  timestamp             DateTime          @default(now())
+  
+  // Relations
+  session               VideoKYCSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([timestamp])
+  @@map("video_kyc_chat_messages")
 }
 
 model FeatureResult {
@@ -533,132 +373,128 @@ model FeatureResult {
 }
 
 // ============================================
-// AUDIT & COMPLIANCE LOGGING
+// E-KYC VERIFICATION SYSTEM
 // ============================================
 
-enum AuditAction {
-  USER_CREATED
-  USER_UPDATED
-  USER_DELETED
-  USER_LOGIN
-  USER_LOGOUT
-  VERIFICATION_STARTED
-  VERIFICATION_COMPLETED
+enum EkycStatus {
+  PENDING
   DOCUMENT_UPLOADED
-  DOCUMENT_VERIFIED
-  FACE_MATCHED
-  LIVENESS_CHECKED
-  AML_CHECKED
-  RISK_ASSESSED
+  SELFIE_UPLOADED
+  PROCESSING
+  COMPLETED
+  FAILED
   MANUAL_REVIEW
-  STATUS_CHANGED
-  DATA_EXPORTED
-  API_KEY_CREATED
-  API_KEY_REVOKED
 }
 
-model AuditLog {
-  id           String      @id @default(cuid())
-  userId       String?
-  action       AuditAction
-  resource     String?     // Resource type (User, Document, etc.)
-  resourceId   String?     // ID of affected resource
+enum EkycDecision {
+  APPROVED
+  REJECTED
+  REVIEW_REQUIRED
+  PENDING
+}
+
+enum DocumentType {
+  PASSPORT
+  DRIVERS_LICENSE
+  NATIONAL_ID
+  RESIDENCE_PERMIT
+  VOTER_ID
+}
+
+model EkycSession {
+  id                    String            @id @default(cuid())
+  userId                String
+  sessionId             String            @unique @default(cuid())
+  status                EkycStatus        @default(PENDING)
+  decision              EkycDecision      @default(PENDING)
   
-  // Request Details
-  ipAddress    String?
-  userAgent    String?
-  method       String?     // HTTP method
-  endpoint     String?     // API endpoint
+  // Session Metadata
+  ipAddress             String?
+  userAgent             String?
   
-  // Changes
-  oldValue     Json?
-  newValue     Json?
+  // Scores
+  documentScore         Float?            // Document authenticity score (0-100)
+  faceMatchScore        Float?            // Face matching score (0-100)
+  livenessScore         Float?            // Liveness detection score (0-100)
+  overallScore          Float?            // Combined risk score (0-100)
   
-  // Metadata
-  success      Boolean     @default(true)
-  errorMessage String?
-  createdAt    DateTime    @default(now())
+  // Decision Details
+  rejectionReason       String?
+  reviewNotes           String?
+  
+  // Timestamps
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  completedAt           DateTime?
   
   // Relations
-  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents             EkycDocument[]
+  results               EkycResult[]
   
   @@index([userId])
-  @@index([action])
+  @@index([sessionId])
+  @@index([status])
   @@index([createdAt])
-  @@map("audit_logs")
+  @@map("ekyc_sessions")
 }
 
-// ============================================
-// API MANAGEMENT
-// ============================================
-
-enum ApiKeyStatus {
-  ACTIVE
-  REVOKED
-  EXPIRED
-}
-
-model ApiKey {
-  id           String       @id @default(cuid())
-  userId       String
-  name         String
-  key          String       @unique
-  status       ApiKeyStatus @default(ACTIVE)
+model EkycDocument {
+  id                    String            @id @default(cuid())
+  sessionId             String
+  type                  DocumentType
   
-  // Permissions
-  permissions  Json?        // Scoped permissions
+  // File Storage
+  frontImageUrl         String
+  backImageUrl          String?
   
-  // Usage Tracking
-  lastUsedAt   DateTime?
-  requestCount Int          @default(0)
+  // Extracted Data
+  documentNumber        String?
+  fullName              String?
+  dateOfBirth           String?
+  expiryDate            String?
+  issuingCountry        String?
+  extractedData         Json?             // Full OCR data
   
-  // Limits
-  rateLimit    Int?         // Requests per minute
-  expiresAt    DateTime?
+  // Verification Results
+  isAuthentic           Boolean?
+  confidenceScore       Float?
+  tamperingDetected     Boolean           @default(false)
   
   // Metadata
-  createdAt    DateTime     @default(now())
-  revokedAt    DateTime?
+  uploadedAt            DateTime          @default(now())
+  processedAt           DateTime?
   
   // Relations
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session               EkycSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   
-  @@index([userId])
-  @@index([key])
-  @@map("api_keys")
+  @@index([sessionId])
+  @@map("ekyc_documents")
 }
 
-// ============================================
-// ANALYTICS & REPORTING
-// ============================================
-
-model VerificationMetrics {
-  id                    String   @id @default(cuid())
-  date                  DateTime @default(now())
+model EkycResult {
+  id                    String            @id @default(cuid())
+  sessionId             String
   
-  // Volume Metrics
-  totalVerifications    Int      @default(0)
-  completedVerifications Int     @default(0)
-  rejectedVerifications Int      @default(0)
-  pendingVerifications  Int      @default(0)
+  // Verification Type
+  verificationType      String            // 'document_auth', 'face_match', 'liveness'
   
-  // Success Rates
-  approvalRate          Float?   // Percentage
-  rejectionRate         Float?
-  manualReviewRate      Float?
+  // Results
+  score                 Float
+  isPassed              Boolean
+  confidence            Float?
+  details               Json?
   
-  // Average Scores
-  avgRiskScore          Float?
-  avgDocumentScore      Float?
-  avgFaceMatchScore     Float?
+  // Metadata
+  modelVersion          String?
+  processedAt           DateTime          @default(now())
+  processingTime        Int?              // milliseconds
   
-  // Processing Times
-  avgProcessingTime     Int?     // Seconds
+  // Relations
+  session               EkycSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   
-  // Fraud Detection
-  fraudDetected         Int      @default(0)
-  fraudRate             Float?
-  
-  @@index([date])
-  @@map("verification_metrics")
+  @@index([sessionId])
+  @@index([verificationType])
+  @@map("ekyc_results")
 }
+
