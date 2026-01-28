@@ -274,3 +274,20 @@ class VideoKYCSessionHistoryResponse(BaseModel):
     total: int
     page: int
     pageSize: int
+
+
+# ============================================
+# ID Document OCR
+# ============================================
+
+class VideoKYCIdCaptureResponse(BaseModel):
+    """Response from ID capture and OCR"""
+    success: bool
+    idNumber: Optional[str] = None
+    idType: Optional[str] = None
+    confidence: Optional[float] = None
+    fullText: Optional[str] = None
+    error: Optional[str] = None
+    processing_time: Optional[int] = None
+    quality_score: Optional[float] = None
+    message: Optional[str] = None

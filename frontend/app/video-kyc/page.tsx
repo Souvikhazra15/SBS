@@ -7,18 +7,22 @@ import { ArrowLeftIcon } from '@/components/icons/Icons'
 import { LoadingSpinner } from '@/components/upload/LoadingSpinner'
 import { useToast } from '@/components/Toast'
 import { VideoKYCWebcam } from '@/components/videokyc/VideoKYCWebcam'
+import { CaptureIdPhoto } from '@/components/videokyc/CaptureIdPhoto'
 import { ChatInterface } from '@/components/videokyc/ChatInterface'
 import { VoiceInput } from '@/components/videokyc/VoiceInput'
 import { useVideoKYCStore } from '@/lib/stores/videoKycStore'
 import { kycQuestions } from '@/lib/videoKycQuestions'
+import { VerificationService } from '@/services/verification'
 
-type SessionStatus = 'idle' | 'connecting' | 'verification-flow' | 'document-verification' | 'ai-analysis' | 'agent-review' | 'completed' | 'rejected'
+type SessionStatus = 'idle' | 'connecting' | 'verification-flow' | 'id-capture' | 'document-verification' | 'ai-analysis' | 'agent-review' | 'completed' | 'rejected'
 
 
 export default function VideoKYCPage() {
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>('idle')
   const [textInput, setTextInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [extractedIdNumber, setExtractedIdNumber] = useState<string | null>(null)
+  const [idConfidence, setIdConfidence] = useState<number | null>(null)
   const { showToast } = useToast()
   
   const {
@@ -168,7 +172,10 @@ export default function VideoKYCPage() {
           setCurrentStep(currentStep + 1)
           loadQuestion(currentStep + 1)
         } else {
-          processVerification()
+          // Move to ID capture step after all questions
+          setSessionStatus('id-capture')
+          addMessage({ text: 'Great! Now please capture your ID document for verification.', type: 'agent' })
+          speak('Please hold your ID document in front of the camera and capture it')
         }
         setIsProcessing(false)
       }, 1500)
@@ -179,6 +186,78 @@ export default function VideoKYCPage() {
         title: 'Upload Failed',
         message: 'Please try capturing again'
       })
+      setIsProcessing(false)
+    }
+  }
+
+  // Handle ID document capture
+  const handleIdCapture = async (imageBlob: Blob, previewUrl: string) => {
+    if (!sessionId) {
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'No active session found'
+      })
+      return
+    }
+
+    setIsProcessing(true)
+
+    try {
+      console.log('[VIDEO-KYC] Uploading ID document for OCR processing...')
+      
+      const result = await VerificationService.captureIdDocument(sessionId, imageBlob)
+
+      if (result.success && result.idNumber) {
+        setExtractedIdNumber(result.idNumber)
+        setIdConfidence(result.confidence || 0)
+        
+        addMessage({ 
+          text: `ID Number extracted: ${result.idNumber} (${result.idType}, Confidence: ${(result.confidence! * 100).toFixed(1)}%)`, 
+          type: 'agent' 
+        })
+        
+        showToast({
+          type: 'success',
+          title: 'ID Extracted Successfully',
+          message: `ID Number: ${result.idNumber}`
+        })
+
+        speak(`ID number ${result.idNumber} extracted successfully. Proceeding to verification.`)
+        
+        // Move to document verification
+        setTimeout(() => {
+          processVerification()
+        }, 2000)
+      } else {
+        addMessage({ 
+          text: `OCR failed: ${result.error || 'Could not extract ID number'}. Please retake the photo.`, 
+          type: 'agent' 
+        })
+        
+        showToast({
+          type: 'error',
+          title: 'OCR Failed',
+          message: result.message || result.error || 'Please ensure ID is clear and well-lit'
+        })
+        
+        speak('ID extraction failed. Please try again with better lighting.')
+      }
+      
+      setIsProcessing(false)
+    } catch (error) {
+      console.error('[VIDEO-KYC] ID capture error:', error)
+      addMessage({ 
+        text: 'Failed to process ID document. Please try again.', 
+        type: 'agent' 
+      })
+      
+      showToast({
+        type: 'error',
+        title: 'Processing Failed',
+        message: 'Please try capturing again'
+      })
+      
       setIsProcessing(false)
     }
   }
@@ -304,17 +383,18 @@ export default function VideoKYCPage() {
         {/* Process Flow */}
         <div className="mb-16">
           <h2 className="text-2xl font-bold text-dark-900 dark:text-white mb-8 text-center">Verification Process</h2>
-          <div className="grid md:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-5 gap-4">
             {[
-              { step: '1', title: 'Start Session', description: 'Initialize verification session', active: sessionStatus === 'connecting' || sessionStatus === 'idle' },
-              { step: '2', title: 'Information Collection', description: 'Answer questions and capture documents', active: sessionStatus === 'verification-flow' },
-              { step: '3', title: 'AI Analysis', description: 'Automated verification checks', active: sessionStatus === 'document-verification' || sessionStatus === 'ai-analysis' },
-              { step: '4', title: 'Agent Review', description: 'Final approval by KYC agent', active: sessionStatus === 'agent-review' || sessionStatus === 'completed' }
+              { step: '1', title: 'Start Session', description: 'Initialize verification', active: sessionStatus === 'connecting' || sessionStatus === 'idle' },
+              { step: '2', title: 'Information', description: 'Answer questions', active: sessionStatus === 'verification-flow' },
+              { step: '3', title: 'ID Capture', description: 'Scan ID document', active: sessionStatus === 'id-capture' },
+              { step: '4', title: 'AI Analysis', description: 'Automated checks', active: sessionStatus === 'document-verification' || sessionStatus === 'ai-analysis' },
+              { step: '5', title: 'Agent Review', description: 'Final approval', active: sessionStatus === 'agent-review' || sessionStatus === 'completed' }
             ].map((item, index) => (
-              <Card key={index} className={`text-center p-6 transition-all duration-300 ${
+              <Card key={index} className={`text-center p-4 transition-all duration-300 ${
                 item.active ? 'ring-2 ring-primary-500 dark:ring-primary-400' : ''
               }`}>
-                <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full font-bold text-xl mb-4 mx-auto transition-colors duration-300 ${
+                <div className={`inline-flex items-center justify-center w-12 h-12 rounded-full font-bold text-lg mb-3 mx-auto transition-colors duration-300 ${
                   item.active 
                     ? 'bg-primary-600 dark:bg-primary-500 text-white animate-pulse' 
                     : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
@@ -449,6 +529,50 @@ export default function VideoKYCPage() {
                     <p className="text-sm text-blue-700 dark:text-blue-300">
                       📷 Click the capture button on the camera to take a photo when ready
                     </p>
+                  </Card>
+                )}
+              </div>
+            )}
+
+            {sessionStatus === 'id-capture' && (
+              <div>
+                <Card className="p-6 mb-4">
+                  <h3 className="text-xl font-semibold text-dark-900 dark:text-white mb-2">
+                    📄 Capture Your ID Document
+                  </h3>
+                  <p className="text-dark-600 dark:text-dark-400 text-sm mb-4">
+                    We'll use OCR to extract your ID number automatically. Please ensure the document is clearly visible.
+                  </p>
+                </Card>
+
+                <CaptureIdPhoto 
+                  onCapture={handleIdCapture}
+                  isProcessing={isProcessing}
+                />
+
+                {extractedIdNumber && (
+                  <Card className="p-6 mt-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700">
+                    <div className="flex items-start gap-3">
+                      <div className="text-3xl">✅</div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-green-800 dark:text-green-300 mb-1">
+                          ID Number Extracted
+                        </h4>
+                        <p className="text-green-700 dark:text-green-400 text-lg font-mono mb-2">
+                          {extractedIdNumber}
+                        </p>
+                        <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-500">
+                          <span>Confidence:</span>
+                          <div className="flex-1 bg-green-200 dark:bg-green-800 rounded-full h-2">
+                            <div 
+                              className="bg-green-600 dark:bg-green-400 h-2 rounded-full"
+                              style={{ width: `${(idConfidence || 0) * 100}%` }}
+                            />
+                          </div>
+                          <span>{((idConfidence || 0) * 100).toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    </div>
                   </Card>
                 )}
               </div>

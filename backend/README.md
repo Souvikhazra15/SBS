@@ -1,4 +1,4 @@
-# VerifyAI Backend - Prisma Database Schema
+# Deep Defenders Backend - Prisma Database Schema
 
 Complete database structure for the KYC/Identity Verification Platform.
 
@@ -41,12 +41,12 @@ cp .env.example .env
 
 For PostgreSQL (recommended):
 ```env
-DATABASE_URL="postgresql://username:password@localhost:5432/verifyai?schema=public"
+DATABASE_URL="postgresql://username:password@localhost:5432/deepdefenders?schema=public"
 ```
 
 For MySQL:
 ```env
-DATABASE_URL="mysql://username:password@localhost:3306/verifyai"
+DATABASE_URL="mysql://username:password@localhost:3306/deepdefenders"
 ```
 
 For SQLite (development only):

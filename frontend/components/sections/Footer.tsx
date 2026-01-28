@@ -39,7 +39,7 @@ export function Footer() {
         <div className="grid md:grid-cols-5 gap-8 mb-12">
           {/* Brand */}
           <div>
-            <div className="font-bold text-2xl bg-gradient-to-r from-primary-500 to-primary-600 dark:from-primary-400 dark:to-primary-500 bg-clip-text text-transparent mb-3">VerifyAI</div>
+            <div className="font-bold text-2xl bg-gradient-to-r from-primary-500 to-primary-600 dark:from-primary-400 dark:to-primary-500 bg-clip-text text-transparent mb-3">Deep Defenders</div>
             <p className="text-sm text-dark-500 dark:text-dark-600">
               Enterprise identity verification platform. Secure. Compliant. Simple.
             </p>
@@ -70,7 +70,7 @@ export function Footer() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             {/* Copyright */}
             <p className="text-sm text-dark-500 dark:text-dark-600 mb-4 md:mb-0">
-              © {currentYear} VerifyAI. All rights reserved.
+              © {currentYear} Deep Defenders. All rights reserved.
             </p>
 
             {/* Social links */}

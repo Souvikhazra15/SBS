@@ -416,6 +416,41 @@ class VerificationService {
   }
 
   /**
+   * Capture and process ID document with OCR
+   */
+  static async captureIdDocument(
+    sessionId: string,
+    imageBlob: Blob,
+    onProgress?: (progress: number) => void
+  ): Promise<{
+    success: boolean
+    idNumber?: string
+    idType?: string
+    confidence?: number
+    fullText?: string
+    error?: string
+    processing_time?: number
+    quality_score?: number
+    message?: string
+  }> {
+    const formData = new FormData()
+    formData.append('file', imageBlob, 'id-document.jpg')
+    formData.append('session_id', sessionId)
+
+    return apiService.post('/api/v1/video-kyc/capture-id', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent: any) => {
+        if (onProgress && progressEvent.total) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          onProgress(progress)
+        }
+      },
+    })
+  }
+
+  /**
    * Submit an answer to a Video KYC question
    */
   async submitVideoKYCAnswer(
@@ -487,4 +522,5 @@ class VerificationService {
   }
 }
 
+export { VerificationService }
 export const verificationService = new VerificationService()

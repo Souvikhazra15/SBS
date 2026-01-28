@@ -21,13 +21,13 @@ const integrations = [
   {
     label: 'SDKs',
     description: 'Client libraries for JavaScript, Python, Go, and more.',
-    example: 'npm install @verifyai/sdk',
+    example: 'npm install @deepdefenders/sdk',
     color: 'from-purple-400 to-purple-600',
   },
   {
     label: 'Dashboard',
     description: 'Beautiful admin panel for monitoring and management.',
-    example: 'dashboard.verifyai.io',
+    example: 'dashboard.deepdefenders.io',
     color: 'from-pink-400 to-pink-600',
   },
 ]
@@ -104,9 +104,9 @@ export function IntegrationSection() {
             <p className="text-dark-400 text-sm">Initialize verification with just a few lines of code:</p>
           </div>
           <pre className="bg-dark-800 p-4 rounded-lg overflow-x-auto text-sm font-mono">
-            <code>{`import { VerifyAI } from '@verifyai/sdk';
+            <code>{`import { DeepDefenders } from '@deepdefenders/sdk';
 
-const client = new VerifyAI({
+const client = new DeepDefenders({
   apiKey: 'sk_live_...'
 });
 

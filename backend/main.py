@@ -1,5 +1,5 @@
 """
-VerifyAI KYC Platform - FastAPI Backend
+Deep Defenders KYC Platform - FastAPI Backend
 Clean startup with minimal logging
 """
 
@@ -83,12 +83,12 @@ from src.api.v1.face_matching import router as face_matching_router
 from src.api.v1.deepfake import router as deepfake_router
 from src.api.v1.risk_scoring import router as risk_scoring_router
 from src.api.v1.ekyc import router as ekyc_router
-# from src.api.v1.video_kyc import router as video_kyc_router  # TODO: Enable after database migration
+from src.api.v1.video_kyc import router as video_kyc_router
 
 # Initialize FastAPI app
 app = FastAPI(
     lifespan=lifespan,
-    title="VerifyAI KYC Platform API",
+    title="Deep Defenders KYC Platform API",
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -125,13 +125,13 @@ app.include_router(face_matching_router, prefix="/api/v1")
 app.include_router(deepfake_router, prefix="/api/v1")
 app.include_router(risk_scoring_router, prefix="/api/v1")
 app.include_router(ekyc_router, prefix="/api/v1")
-# app.include_router(video_kyc_router, prefix="/api/v1")  # TODO: Enable after database migration
+app.include_router(video_kyc_router, prefix="/api/v1")
 
 # Root endpoint
 @app.get("/")
 async def root():
     return {
-        "service": "VerifyAI KYC Platform API",
+        "service": "Deep Defenders KYC Platform API",
         "version": "2.0.0",
         "status": "operational",
         "documentation": "/docs"

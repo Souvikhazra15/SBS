@@ -1,7 +1,7 @@
 {
-  "name": "verifyai-backend",
+  "name": "deepdefenders-backend",
   "version": "1.0.0",
-  "description": "VerifyAI Identity Verification Backend",
+  "description": "Deep Defenders Identity Verification Backend",
   "main": "src/index.js",
   "scripts": {
     "dev": "node src/index.js",

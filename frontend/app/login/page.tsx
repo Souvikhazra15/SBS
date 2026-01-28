@@ -50,7 +50,7 @@ export default function LoginPage() {
         <div className="text-center">
           <Link href="/" className="inline-block mb-8">
             <div className="font-bold text-3xl bg-gradient-to-r from-primary-500 to-primary-600 dark:from-primary-400 dark:to-primary-500 bg-clip-text text-transparent">
-              VerifyAI
+              Deep Defenders
             </div>
           </Link>
           <h2 className="text-3xl font-bold text-dark-900 dark:text-white mb-2">

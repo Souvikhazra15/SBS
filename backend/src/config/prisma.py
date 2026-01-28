@@ -1,7 +1,7 @@
 """
 Prisma Database Configuration
 
-Database connection and client initialization for the VerifyAI platform.
+Database connection and client initialization for the Deep Defenders platform.
 Handles PostgreSQL connection with connection pooling and error handling.
 """
 

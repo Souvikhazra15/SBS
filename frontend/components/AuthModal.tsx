@@ -115,7 +115,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
         <div className="p-8 pb-6">
           <div className="text-center mb-6">
             <h2 className="text-3xl font-bold text-dark-900 dark:text-white mb-2">
-              Welcome to VerifyAI
+              Welcome to Deep Defenders
             </h2>
             <p className="text-dark-600 dark:text-dark-400">
               {activeTab === 'login' ? 'Sign in to your account' : 'Create your account'}

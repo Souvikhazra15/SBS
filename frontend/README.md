@@ -1,4 +1,4 @@
-# VerifyAI - Modern SaaS Landing Page
+# Deep Defenders - Modern SaaS Landing Page
 
 A modern, responsive SaaS landing page built with Next.js 14, TypeScript, and Tailwind CSS. Inspired by enterprise identity-verification platforms but with original design and custom branding.
 

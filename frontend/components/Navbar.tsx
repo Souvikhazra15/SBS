@@ -20,7 +20,7 @@ export function Navbar() {
         <div className="flex items-center justify-between py-4">
           {/* Logo */}
           <div className="flex items-center">
-            <div className="text-xl sm:text-2xl font-bold gradient-text">VerifyAI</div>
+            <div className="text-xl sm:text-2xl font-bold gradient-text">Deep Defenders</div>
           </div>
 
           {/* Desktop Navigation */}

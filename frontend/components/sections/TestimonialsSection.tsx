@@ -7,7 +7,7 @@ import { StarIcon } from '@/components/icons/Icons'
 
 const testimonials = [
   {
-    content: 'VerifyAI reduced our onboarding time by 70% while maintaining excellent security standards. The API integration was seamless.',
+    content: 'Deep Defenders reduced our onboarding time by 70% while maintaining excellent security standards. The API integration was seamless.',
     author: 'Sarah Chen',
     title: 'Head of Compliance',
     company: 'FinTech Innovations',
@@ -48,7 +48,7 @@ export function TestimonialsSection() {
             Trusted by Industry Leaders
           </h2>
           <p className="text-lg text-dark-500 dark:text-dark-400 max-w-2xl mx-auto">
-            See what companies are saying about their experience with VerifyAI.
+            See what companies are saying about their experience with Deep Defenders.
           </p>
         </div>
 

@@ -1,4 +1,4 @@
-// Prisma Schema for VerifyAI Identity Verification Platform
+// Prisma Schema for Deep Defenders Identity Verification Platform
 // Database: PostgreSQL (recommended for production)
 
 generator client {
@@ -245,6 +245,7 @@ model VideoKYCSession {
   answers               VideoKYCAnswer[]
   verificationResults   VideoKYCVerificationResult[]
   chatMessages          VideoKYCChatMessage[]
+  documents             VideoKycDocument[]
   
   @@index([userId])
   @@index([sessionStatus])
@@ -352,6 +353,36 @@ model VideoKYCChatMessage {
   @@index([sessionId])
   @@index([timestamp])
   @@map("video_kyc_chat_messages")
+}
+
+model VideoKycDocument {
+  id                    String            @id @default(cuid())
+  sessionId             String
+  
+  // Extracted Data
+  idNumber              String
+  fullText              String?           // All extracted text
+  ocrJson               Json              // Full OCR response
+  
+  // Verification
+  confidence            Float?
+  isValid               Boolean           @default(false)
+  
+  // Image Details
+  imagePath             String?
+  imageUrl              String?
+  
+  // Metadata
+  createdAt             DateTime          @default(now())
+  processedAt           DateTime?
+  processingTime        Int?              // milliseconds
+  
+  // Relations
+  session               VideoKYCSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([idNumber])
+  @@map("video_kyc_documents")
 }
 
 model FeatureResult {

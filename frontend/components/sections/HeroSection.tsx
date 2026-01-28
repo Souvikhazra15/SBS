@@ -44,7 +44,7 @@ function AbstractIllustration() {
                 playsInline
                 className="w-full h-full object-cover"
               >
-                <source src="/videos/🎥_KYC_Face_Scanning_–_Video_P (1).mp4" type="video/mp4" />
+                <source src="/videos/🎥_KYC_Face_Scanning_–_Video_P (2).mp4" type="video/mp4" />
               </video>
             </div>
           </foreignObject>

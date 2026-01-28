@@ -6,7 +6,7 @@ import { ToastProvider } from "@/components/Toast"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "VerifyAI - AI-Powered KYC Verification",
+  title: "Deep Defenders - AI-Powered KYC Verification",
   description: "Enterprise-grade identity verification platform with AI-powered document OCR, fraud prevention, and AML compliance.",
   robots: "index, follow",
 }
