@@ -1,4 +1,4 @@
-# Video-KYC Identity Verification Platform
+# DeepDefenders
 
 A comprehensive AI-powered Video-KYC (Know Your Customer) identity verification platform with real-time video processing, OCR document scanning, face matching, and automated risk assessment.
 
