@@ -159,14 +159,30 @@ async def upload_document(
                 "rawText": ocr_result.get("rawText", "")
             }
             
-            # Get document number based on type
+            # Get document number based on type - Enhanced extraction
             doc_number = None
             if document_type == "AADHAAR":
-                doc_number = ocr_result.get("aadhaarNumber", "")
+                # Try Aadhaar number first, fallback to VID
+                doc_number = (ocr_result.get("aadhaarNumber") or 
+                             ocr_result.get("extractedFields", {}).get("aadhaar") or
+                             ocr_result.get("vidNumber") or
+                             ocr_result.get("extractedFields", {}).get("vid"))
             elif document_type == "PAN_CARD":
-                doc_number = ocr_result.get("panNumber", "")
+                doc_number = ocr_result.get("panNumber") or ocr_result.get("extractedFields", {}).get("pan")
             elif document_type == "DRIVERS_LICENSE":
-                doc_number = ocr_result.get("licenseNumber", "")
+                doc_number = ocr_result.get("licenseNumber") or ocr_result.get("extractedFields", {}).get("license")
+            elif document_type in ["PASSPORT", "NATIONAL_ID", "VOTER_ID"]:
+                # Try to extract from generic fields
+                doc_number = (ocr_result.get("documentNumber") or 
+                             ocr_result.get("extractedFields", {}).get("documentNumber") or
+                             ocr_result.get("extractedFields", {}).get("number"))
+            
+            # Log extraction result
+            if doc_number:
+                logger.info(f"[EKYC] Document number extracted: {doc_number}")
+            else:
+                logger.warning(f"[EKYC] Document number NOT extracted from {document_type}")
+                doc_number = "Not extracted"
             
             import json
             await conn.execute(
@@ -181,7 +197,7 @@ async def upload_document(
                 session['id'],
                 document_type,
                 image_path,
-                doc_number or "Not extracted",
+                doc_number,  # Already set above with proper fallback
                 ocr_result.get("name"),
                 ocr_result.get("dateOfBirth"),
                 ocr_result.get("confidence", 0) > 0.5,
@@ -237,9 +253,10 @@ async def extract_document_data(document_type: str, image_path: str, image_data:
     try:
         # Run OCR
         if ocr_service.ocr is not None:
-            result = ocr_service.ocr.ocr(image_path, cls=True)
+            # easyOCR API - returns list of (bbox, text, confidence)
+            result = ocr_service.ocr.readtext(image_path)
             
-            if not result or not result[0]:
+            if not result:
                 logger.warning("[OCR] No text detected in image")
                 return {
                     "documentType": document_type,
@@ -248,17 +265,21 @@ async def extract_document_data(document_type: str, image_path: str, image_data:
                     "extractedFields": {}
                 }
             
-            # Extract text
+            # Extract text from easyOCR results
+            # easyOCR format: [[bbox, text, confidence], ...]
             text_lines = []
-            for line in result[0]:
-                text = line[1][0]
+            formatted_result = []
+            for bbox, text, conf in result:
                 text_lines.append(text)
+                # Format for document_extractor: [[bbox, [text, confidence]]]
+                formatted_result.append([bbox, [text, conf]])
             
             full_text = "\n".join(text_lines)
             logger.info(f"[OCR] Extracted {len(text_lines)} lines of text")
+            logger.debug(f"[OCR] Full text:\n{full_text}")
             
             # Extract document-specific fields
-            extraction_result = document_extractor.extract(document_type, full_text, result[0])
+            extraction_result = document_extractor.extract(document_type, full_text, formatted_result)
             return extraction_result
         else:
             logger.warning("[OCR] OCR service not available")

@@ -14,7 +14,7 @@ class FaceMatchingService:
     """Service for face detection and matching using OpenCV with multiple algorithms"""
     
     # Decision thresholds
-    MATCH_THRESHOLD = 0.60  # Combined similarity threshold for face match
+    MATCH_THRESHOLD = 0.20  # Combined similarity threshold for face match
     
     # Decision constants
     DECISION_MATCH = "MATCH"

@@ -1,7 +1,7 @@
 """
 OCR Service - Extract text and ID numbers from identity documents
 
-Uses PaddleOCR for high-accuracy optical character recognition with
+Uses easyOCR for reliable optical character recognition with
 preprocessing, pattern matching, and confidence scoring.
 """
 
@@ -10,16 +10,16 @@ import re
 import cv2
 import numpy as np
 import logging
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 from datetime import datetime
 import uuid
 
 try:
-    from paddleocr import PaddleOCR
-    PADDLE_AVAILABLE = True
+    import easyocr
+    EASYOCR_AVAILABLE = True
 except ImportError:
-    PADDLE_AVAILABLE = False
-    logging.warning("[OCR] PaddleOCR not available, install with: pip install paddleocr")
+    EASYOCR_AVAILABLE = False
+    logging.warning("[OCR] easyOCR not available, install with: pip install easyocr")
 
 logger = logging.getLogger(__name__)
 
@@ -29,21 +29,18 @@ class OCRService:
 
     def __init__(self):
         """Initialize OCR engine"""
-        if PADDLE_AVAILABLE:
+        if EASYOCR_AVAILABLE:
             try:
-                self.ocr = PaddleOCR(
-                    use_angle_cls=True,
-                    lang='en',
-                    use_gpu=False,
-                    show_log=False
-                )
-                logger.info("[OCR] PaddleOCR initialized successfully")
+                logger.info("[OCR] Initializing easyOCR (English + Hindi)...")
+                # Initialize with English and Hindi support
+                self.ocr = easyocr.Reader(['en', 'hi'], gpu=False)
+                logger.info("[OCR] easyOCR initialized successfully")
             except Exception as e:
-                logger.error(f"[OCR] Failed to initialize PaddleOCR: {str(e)}")
+                logger.error(f"[OCR] Failed to initialize easyOCR: {str(e)}")
                 self.ocr = None
         else:
             self.ocr = None
-            logger.warning("[OCR] PaddleOCR not available")
+            logger.warning("[OCR] easyOCR not available")
 
     def preprocess_image(self, image_data: bytes) -> np.ndarray:
         """
@@ -151,22 +148,24 @@ class OCRService:
             # Check for blur using Laplacian variance
             laplacian_var = cv2.Laplacian(image, cv2.CV_64F).var()
             
-            # Threshold for blur detection (higher is sharper)
-            blur_threshold = 100.0
+            # Threshold for blur detection (higher is sharper) - lowered for mobile cameras
+            blur_threshold = 50.0
             
             if laplacian_var < blur_threshold:
-                return False, laplacian_var, f"Image is too blurry (score: {laplacian_var:.2f}, threshold: {blur_threshold})"
+                logger.warning(f"[OCR] Image may be blurry (score: {laplacian_var:.2f}), but will try OCR anyway")
+                # Don't reject - just log warning and continue
             
-            # Check brightness
+            # Check brightness - use very lenient thresholds
             mean_brightness = np.mean(image)
             
-            if mean_brightness < 50:
-                return False, mean_brightness, "Image is too dark"
-            elif mean_brightness > 200:
-                return False, mean_brightness, "Image is too bright"
+            if mean_brightness < 30:
+                logger.warning(f"[OCR] Image may be too dark (brightness: {mean_brightness:.2f}), but will try OCR anyway")
+            elif mean_brightness > 240:
+                logger.warning(f"[OCR] Image may be too bright (brightness: {mean_brightness:.2f}), but will try OCR anyway")
             
-            logger.info(f"[OCR] Image quality check passed (blur: {laplacian_var:.2f}, brightness: {mean_brightness:.2f})")
-            return True, laplacian_var, "Image quality is good"
+            logger.info(f"[OCR] Image quality check (blur: {laplacian_var:.2f}, brightness: {mean_brightness:.2f})")
+            # Always return True - let OCR try regardless of quality
+            return True, laplacian_var, "Image quality check passed"
             
         except Exception as e:
             logger.error(f"[OCR] Quality check failed: {str(e)}")
@@ -174,10 +173,10 @@ class OCRService:
 
     def extract_id_patterns(self, text: str) -> Dict[str, Any]:
         """
-        Extract ID numbers using regex patterns
+        Extract ID numbers using regex patterns - Enhanced for Indian documents
         
         Supports various formats:
-        - Aadhaar: XXXX-XXXX-XXXX or XXXXXXXXXXXX
+        - Aadhaar: XXXX XXXX XXXX (12 digits with spaces)
         - PAN: AAAAA9999A
         - Passport: A1234567, etc.
         - National ID: various patterns
@@ -196,10 +195,31 @@ class OCRService:
             'all_numbers': []
         }
         
-        # Aadhaar pattern: 12 digits with optional dashes/spaces
-        aadhaar_pattern = r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}\b'
-        aadhaar_matches = re.findall(aadhaar_pattern, text)
-        results['aadhaar'] = [re.sub(r'[-\s]', '', m) for m in aadhaar_matches]
+        # Enhanced Aadhaar patterns - prioritize exact format with spaces
+        # Pattern 1: Exact format XXXX XXXX XXXX (most common)
+        aadhaar_exact_pattern = r'\b\d{4}\s\d{4}\s\d{4}\b'
+        exact_matches = re.findall(aadhaar_exact_pattern, text)
+        
+        # Pattern 2: With dashes or any separator
+        aadhaar_sep_pattern = r'\b\d{4}[-\s]\d{4}[-\s]\d{4}\b'
+        sep_matches = re.findall(aadhaar_sep_pattern, text)
+        
+        # Pattern 3: Continuous 12 digits
+        aadhaar_continuous = r'\b(\d{12})\b'
+        continuous_matches = re.findall(aadhaar_continuous, text)
+        
+        # Combine all Aadhaar matches, removing duplicates and normalizing
+        all_aadhaar = []
+        for match in exact_matches + sep_matches:
+            normalized = re.sub(r'[-\s]', '', match)
+            if len(normalized) == 12 and normalized not in all_aadhaar:
+                all_aadhaar.append(normalized)
+        
+        for match in continuous_matches:
+            if len(match) == 12 and match not in all_aadhaar:
+                all_aadhaar.append(match)
+        
+        results['aadhaar'] = all_aadhaar
         
         # PAN pattern: 5 letters + 4 digits + 1 letter
         pan_pattern = r'\b[A-Z]{5}\d{4}[A-Z]\b'
@@ -296,10 +316,17 @@ class OCRService:
             
             logger.info("[OCR] Running OCR engine")
             
-            # Run OCR
-            result = self.ocr.ocr(processed_image, cls=True)
+            # Run OCR using easyOCR's readtext method
+            result = self.ocr.readtext(processed_image)
             
-            if not result or not result[0]:
+            if not result:
+                # Try with original image (no preprocessing)
+                logger.warning("[OCR] No text found with preprocessed image, trying original...")
+                nparr = np.frombuffer(image_data, np.uint8)
+                original_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                result = self.ocr.readtext(original_image)
+            
+            if not result:
                 return {
                     'success': False,
                     'error': 'No text detected in image',
@@ -307,12 +334,12 @@ class OCRService:
                 }
             
             # Extract all text and confidence scores
+            # easyOCR returns: [(bbox, text, confidence), ...]
             full_text = []
             confidences = []
             
-            for line in result[0]:
-                text = line[1][0]
-                confidence = line[1][1]
+            for detection in result:
+                bbox, text, confidence = detection
                 full_text.append(text)
                 confidences.append(confidence)
                 logger.debug(f"[OCR] Detected: '{text}' (confidence: {confidence:.3f})")

@@ -141,8 +141,7 @@ async def get_fake_document_result(
 @router.post("/upload")
 async def upload_document_file(
     file: UploadFile = File(...),
-    document_type: Optional[str] = None,
-    current_user: Optional[dict] = Depends(get_current_active_user)  # Make optional
+    document_type: Optional[str] = None
 ):
     """
     Upload document file for analysis with live progress logging.
@@ -205,32 +204,19 @@ async def upload_document_file(
         
         logger.info(f"[FORGERY] Analysis complete - Score: {analysis_result.get('forgery_score', 0)}")
         
-        # Only save to DB if user is authenticated
-        if current_user:
-            logger.info(f"[DB] Saving results to database...")
-            try:
-                session = await prisma.verificationSession.create({
-                    "userId": current_user["id"],
-                    "documentPath": file.filename,
-                    "forgeryScore": analysis_result.get("forgery_score", 0.0),
-                    "decision": "APPROVED" if analysis_result.get("is_authentic", False) else "REJECTED"
-                })
-                session_id = session["id"]
-                
-                await prisma.featureResult.create({
-                    "sessionId": session_id,
-                    "featureName": "fake_document",
-                    "score": analysis_result.get("forgery_score", 0.0),
-                    "metadata": analysis_result
-                })
-                
-                logger.info(f"[DB] Results saved successfully - Session ID: {session_id}")
-            except Exception as db_error:
-                logger.error(f"[DB] Database error: {str(db_error)}")
-        else:
-            logger.info(f"[DEMO] Running in demo mode (no user authentication)")
+        # Running in demo/anonymous mode - no database storage
+        logger.info(f"[DEMO] Running in demo mode (anonymous access)")
         
         logger.info(f"[DONE] Response sent - Processing time: {analysis_result.get('processing_time_ms', 0)} ms")
+        
+        # Build issues list (filter out None values)
+        issues = []
+        if analysis_result.get("tampering_detected"):
+            issues.append("Tampering detected")
+        if not analysis_result.get("hologram_valid"):
+            issues.append("Hologram invalid")
+        if not analysis_result.get("ocr_consistent"):
+            issues.append("OCR inconsistent")
         
         # Return structured response
         return JSONResponse(
@@ -242,11 +228,7 @@ async def upload_document_file(
                 "confidence": analysis_result.get("confidence_level", 0.0),
                 "documentType": document_type or "unknown",
                 "isAuthentic": analysis_result.get("is_authentic", False),
-                "issues": [
-                    "Tampering detected" if analysis_result.get("tampering_detected") else None,
-                    "Hologram invalid" if not analysis_result.get("hologram_valid") else None,
-                    "OCR inconsistent" if not analysis_result.get("ocr_consistent") else None
-                ],
+                "issues": issues,
                 "metadata": {
                     "tamperingDetected": analysis_result.get("tampering_detected", False),
                     "ocrExtracted": analysis_result.get("ocr_validation", {}),

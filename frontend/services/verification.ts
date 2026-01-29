@@ -419,7 +419,7 @@ class VerificationService {
    * Capture and process ID document with OCR
    */
   static async captureIdDocument(
-    sessionId: string,
+    sessionId: string | null,
     imageBlob: Blob,
     onProgress?: (progress: number) => void
   ): Promise<{
@@ -435,7 +435,11 @@ class VerificationService {
   }> {
     const formData = new FormData()
     formData.append('file', imageBlob, 'id-document.jpg')
-    formData.append('session_id', sessionId)
+    
+    // Session ID is optional - backend will auto-create if needed
+    if (sessionId) {
+      formData.append('session_id', sessionId)
+    }
 
     return apiService.post('/api/v1/video-kyc/capture-id', formData, {
       headers: {

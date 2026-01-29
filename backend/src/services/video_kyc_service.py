@@ -45,11 +45,11 @@ class VideoKYCService:
                 result = await conn.fetchrow('''
                     INSERT INTO video_kyc_sessions 
                     (id, "userId", "sessionStatus", "currentStep", "totalSteps", "ipAddress", "userAgent", 
-                     "documentVerified", "faceMatched", "livenessChecked", "finalDecision", "sessionStartedAt", "createdAt", "updatedAt")
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                     "documentVerified", "faceMatched", "livenessChecked", "finalDecision", "sessionStartedAt")
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                     RETURNING *
                 ''', session_id, user_id, 'IDLE', 0, 8, ip_address, user_agent, False, False, False, 'PENDING',
-                datetime.utcnow(), datetime.utcnow(), datetime.utcnow())
+                datetime.utcnow())
                 
                 session = dict(result)
             
@@ -98,11 +98,7 @@ class VideoKYCService:
                 values.append(value)
                 param_num += 1
             
-            # Add updatedAt
-            set_clauses.append(f'"updatedAt" = ${param_num}')
-            values.append(datetime.utcnow())
-            param_num += 1
-            
+            # No updatedAt column in schema - remove this
             # Add session_id for WHERE clause
             values.append(session_id)
             
@@ -129,10 +125,10 @@ class VideoKYCService:
             async with self.pool.acquire() as conn:
                 result = await conn.fetchrow('''
                     UPDATE video_kyc_sessions 
-                    SET "sessionStatus" = $1, "updatedAt" = $2
-                    WHERE id = $3
+                    SET "sessionStatus" = $1
+                    WHERE id = $2
                     RETURNING *
-                ''', status, datetime.utcnow(), session_id)
+                ''', status, session_id)
                 
                 return dict(result)
                 
@@ -150,7 +146,7 @@ class VideoKYCService:
                 result = await conn.fetchrow('''
                     INSERT INTO video_kyc_questions 
                     (id, "sessionId", "questionText", "questionType", "questionOrder", 
-                     "validationRules", required, "createdAt")
+                     "validationRules", required, "askedAt")
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                     RETURNING *
                 ''', question_id, question_data.sessionId, question_data.questionText,
@@ -174,7 +170,7 @@ class VideoKYCService:
                 result = await conn.fetchrow('''
                     INSERT INTO video_kyc_answers 
                     (id, "sessionId", "questionId", "answerText", "answerType", 
-                     "responseTime", "createdAt")
+                     "responseTime", "answeredAt")
                     VALUES ($1, $2, $3, $4, $5, $6, $7)
                     RETURNING *
                 ''', answer_id, answer_data.sessionId, answer_data.questionId,
@@ -223,11 +219,11 @@ class VideoKYCService:
                 
                 result = await conn.fetchrow('''
                     INSERT INTO video_kyc_chat_messages 
-                    (id, "sessionId", "messageText", "messageType", timestamp, "createdAt")
-                    VALUES ($1, $2, $3, $4, $5, $6)
+                    (id, "sessionId", "messageText", "messageType", timestamp)
+                    VALUES ($1, $2, $3, $4, $5)
                     RETURNING *
                 ''', message_id, message_data.sessionId, message_data.messageText,
-                message_data.messageType, datetime.utcnow(), datetime.utcnow())
+                message_data.messageType, datetime.utcnow())
                 
                 return dict(result)
                 
@@ -282,7 +278,7 @@ class VideoKYCService:
                 result = await conn.fetchrow('''
                     INSERT INTO video_kyc_verification_results 
                     (id, "sessionId", "verificationType", score, confidence, "isPassed", 
-                     details, "modelVersion", "processingTime", "createdAt")
+                     details, "modelVersion", "processingTime", "processedAt")
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                     RETURNING *
                 ''', result_id, result_data.sessionId, result_data.verificationType,
@@ -402,12 +398,11 @@ class VideoKYCService:
                 result = await conn.fetchrow('''
                     UPDATE video_kyc_sessions 
                     SET "sessionStatus" = $1, "finalDecision" = $2, "sessionCompletedAt" = $3,
-                        "agentName" = $4, "agentReviewNotes" = $5, "rejectionReason" = $6,
-                        "updatedAt" = $7
-                    WHERE id = $8
+                        "agentName" = $4, "agentReviewNotes" = $5, "rejectionReason" = $6
+                    WHERE id = $7
                     RETURNING *
                 ''', status, final_decision, datetime.utcnow(), agent_name, agent_review_notes,
-                rejection_reason, datetime.utcnow(), session_id)
+                rejection_reason, session_id)
                 
                 session = dict(result)
             

@@ -192,20 +192,12 @@ export default function VideoKYCPage() {
 
   // Handle ID document capture
   const handleIdCapture = async (imageBlob: Blob, previewUrl: string) => {
-    if (!sessionId) {
-      showToast({
-        type: 'error',
-        title: 'Error',
-        message: 'No active session found'
-      })
-      return
-    }
-
     setIsProcessing(true)
 
     try {
       console.log('[VIDEO-KYC] Uploading ID document for OCR processing...')
       
+      // Session ID is optional - backend will auto-create if needed
       const result = await VerificationService.captureIdDocument(sessionId, imageBlob)
 
       if (result.success && result.idNumber) {
@@ -245,17 +237,21 @@ export default function VideoKYCPage() {
       }
       
       setIsProcessing(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('[VIDEO-KYC] ID capture error:', error)
+      console.error('[VIDEO-KYC] Error details:', JSON.stringify(error, null, 2))
+      
+      const errorMessage = error?.message || error?.details?.detail || 'Unknown error occurred'
+      
       addMessage({ 
-        text: 'Failed to process ID document. Please try again.', 
+        text: `Failed to process ID document: ${errorMessage}. Please try again.`, 
         type: 'agent' 
       })
       
       showToast({
         type: 'error',
         title: 'Processing Failed',
-        message: 'Please try capturing again'
+        message: errorMessage
       })
       
       setIsProcessing(false)

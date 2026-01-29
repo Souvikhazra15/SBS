@@ -10,6 +10,10 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime
 
+# Disable oneDNN/MKLDNN for Windows compatibility
+os.environ['FLAGS_use_mkldnn'] = '0'
+os.environ['PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK'] = 'True'
+
 # Configure clean logging
 logging.basicConfig(
     level=logging.INFO,
@@ -50,32 +54,38 @@ async def lifespan(app: FastAPI):
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
         
-        # Connect to database
+        # Connect to database (optional - continue without it)
         database_url = os.getenv("DATABASE_URL")
-        db_pool = await asyncpg.create_pool(
-            database_url,
-            min_size=1,
-            max_size=10,
-            command_timeout=60,
-            ssl=ssl_context
-        )
+        db_pool = None
         
-        # Set the pool for prisma module
-        from src.config.prisma import set_db_pool
-        set_db_pool(db_pool)
-        
-        # Test database connection
-        async with db_pool.acquire() as conn:
-            await conn.fetchval("SELECT 1")
-        
-        logger.info("✔ Database connected")
+        try:
+            db_pool = await asyncpg.create_pool(
+                database_url,
+                min_size=1,
+                max_size=10,
+                command_timeout=60,
+                ssl=ssl_context
+            )
+            
+            # Set the pool for prisma module
+            from src.config.prisma import set_db_pool
+            set_db_pool(db_pool)
+            
+            # Test database connection
+            async with db_pool.acquire() as conn:
+                await conn.fetchval("SELECT 1")
+            
+            logger.info("✔ Database connected")
+        except Exception as db_error:
+            logger.warning(f"⚠ Database unavailable (OCR will still work): {str(db_error)[:50]}...")
+            db_pool = None
         
     except Exception as e:
-        logger.error(f"❌ Database connection failed: {str(e)}")
-        sys.exit(1)
+        logger.error(f"❌ Startup error: {str(e)}")
     
     # Log API registration
     logger.info("✔ APIs registered")
+    logger.info("✔ Backend started at http://localhost:8000")
     
     yield
     

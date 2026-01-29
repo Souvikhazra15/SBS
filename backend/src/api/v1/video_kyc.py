@@ -40,10 +40,9 @@ router = APIRouter(prefix="/video-kyc", tags=["Video KYC"])
 
 @router.post("/session/create", response_model=VideoKYCSessionResponse)
 async def create_session(
-    request: Request,
-    current_user: dict = Depends(get_current_user),
+    request: Request
 ):
-    """Create a new Video KYC session"""
+    """Create a new Video KYC session (demo mode - no authentication required)"""
     
     pool = get_db_pool()
     service = VideoKYCService(pool)
@@ -52,8 +51,11 @@ async def create_session(
         ip_address = request.client.host if request.client else None
         user_agent = request.headers.get("user-agent")
         
+        # Use demo user ID for anonymous sessions
+        user_id = "demo-user"
+        
         session = await service.create_session(
-            user_id=current_user["id"],
+            user_id=user_id,
             ip_address=ip_address,
             user_agent=user_agent
         )
@@ -66,10 +68,9 @@ async def create_session(
 
 @router.get("/session/{session_id}", response_model=VideoKYCSessionResponse)
 async def get_session(
-    session_id: str,
-    current_user: dict = Depends(get_current_user)
+    session_id: str
 ):
-    """Get Video KYC session by ID"""
+    """Get Video KYC session by ID (demo mode - no authentication required)"""
     
     pool = get_db_pool()
     service = VideoKYCService(pool)
@@ -79,10 +80,6 @@ async def get_session(
         
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-        
-        # Verify user owns this session
-        if session["userId"] != current_user["id"]:
-            raise HTTPException(status_code=403, detail="Access denied")
         
         return session
         
@@ -202,48 +199,42 @@ async def add_chat_message(
 
 
 # ============================================
-# ID Document OCR Capture
+# ID Document OCR Capture (Simplified - No Session Required)
 # ============================================
 
 @router.post("/capture-id", response_model=VideoKYCIdCaptureResponse)
 async def capture_id_document(
     file: UploadFile = File(...),
-    session_id: str = Form(...),
-    current_user: dict = Depends(get_current_user)
+    session_id: Optional[str] = Form(None)
 ):
     """
     Capture and process ID document image with OCR
     
-    Extracts ID number from document using OCR and saves to database.
+    Extracts ID number from document using OCR.
+    Works without authentication or session - just processes the image and returns results.
     """
     
-    pool = get_db_pool()
-    service = VideoKYCService(pool)
     ocr_service = OCRService()
     
     try:
-        logger.info(f"[VIDEO-KYC] ID capture request for session: {session_id}")
-        
-        # Verify session exists and user owns it
-        session = await service.get_session(session_id)
-        if not session or session["userId"] != current_user["id"]:
-            raise HTTPException(status_code=404, detail="Session not found")
+        logger.info(f"[VIDEO-KYC] ID capture request received")
         
         # Validate file is image
         if not file.content_type or not file.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="File must be an image")
         
-        logger.info(f"[VIDEO-KYC] ID frame captured, size: {file.size} bytes")
+        file_size = file.size or 0
+        logger.info(f"[VIDEO-KYC] ID frame captured, size: {file_size / 1024:.1f} KB")
         
         # Read image data
         image_data = await file.read()
         
         # Process with OCR
-        logger.info("[OCR] Running OCR on ID document")
+        logger.info("[VIDEO-KYC OCR] Running OCR on ID document...")
         ocr_result = await ocr_service.process_id_document(image_data)
         
         if not ocr_result['success']:
-            logger.warning(f"[OCR] Failed: {ocr_result.get('error', 'Unknown error')}")
+            logger.warning(f"[VIDEO-KYC OCR] Failed: {ocr_result.get('error', 'Unknown error')}")
             return VideoKYCIdCaptureResponse(
                 success=False,
                 error=ocr_result.get('error', 'OCR processing failed'),
@@ -257,20 +248,11 @@ async def capture_id_document(
         id_type = ocr_result.get('idType', 'unknown')
         confidence = ocr_result['confidence']
         full_text = ocr_result.get('fullText', '')
+        processing_time = ocr_result.get('processing_time', 0)
         
-        logger.info(f"[OCR] Extracted ID: {id_number} (type: {id_type}, confidence: {confidence:.3f})")
-        
-        # Save to database
-        logger.info("[DB] Saving document to database")
-        document_id = await service.save_id_document(
-            session_id=session_id,
-            id_number=id_number,
-            full_text=full_text,
-            ocr_json=ocr_result,
-            confidence=confidence
-        )
-        
-        logger.info(f"[DB] Document saved: {document_id}")
+        logger.info(f"[VIDEO-KYC OCR] ✓ Extracted ID: {id_number}")
+        logger.info(f"[VIDEO-KYC OCR]   Type: {id_type}, Confidence: {confidence:.1%}")
+        logger.info(f"[VIDEO-KYC OCR]   Processing time: {processing_time}ms")
         
         return VideoKYCIdCaptureResponse(
             success=True,
@@ -278,7 +260,7 @@ async def capture_id_document(
             idType=id_type,
             confidence=round(confidence, 3),
             fullText=full_text,
-            processing_time=ocr_result.get('processing_time'),
+            processing_time=processing_time,
             quality_score=ocr_result.get('quality_score'),
             message=f"ID extracted successfully: {id_number}"
         )
@@ -287,7 +269,8 @@ async def capture_id_document(
         raise
     except Exception as e:
         logger.error(f"[VIDEO-KYC] ID capture failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(e)  # Log full traceback
+        raise HTTPException(status_code=500, detail=f"ID capture error: {str(e)}")
 
 
 # ============================================
