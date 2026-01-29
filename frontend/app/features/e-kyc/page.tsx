@@ -640,13 +640,13 @@ export default function EkycPage() {
                   <div className="flex justify-between mb-2">
                     <span className="text-dark-700 dark:text-dark-300">Document Score</span>
                     <span className="font-bold text-dark-900 dark:text-white">
-                      {session.document_score ? `${session.document_score.toFixed(1)}%` : 'N/A'}
+                      {(session.document_score || session.documentScore) ? `${(session.document_score || session.documentScore)?.toFixed(1)}%` : 'N/A'}
                     </span>
                   </div>
                   <div className="w-full bg-dark-200 dark:bg-dark-700 rounded-full h-2">
                     <div 
                       className="bg-primary-600 h-2 rounded-full transition-all duration-1000"
-                      style={{ width: `${session.document_score || 0}%` }}
+                      style={{ width: `${session.document_score || session.documentScore || 0}%` }}
                     />
                   </div>
                 </div>
@@ -655,13 +655,13 @@ export default function EkycPage() {
                   <div className="flex justify-between mb-2">
                     <span className="text-dark-700 dark:text-dark-300">Face Match Score</span>
                     <span className="font-bold text-dark-900 dark:text-white">
-                      {session.face_match_score ? `${session.face_match_score.toFixed(1)}%` : 'N/A'}
+                      {(session.face_match_score || session.faceMatchScore) ? `${(session.face_match_score || session.faceMatchScore)?.toFixed(1)}%` : 'N/A'}
                     </span>
                   </div>
                   <div className="w-full bg-dark-200 dark:bg-dark-700 rounded-full h-2">
                     <div 
                       className="bg-primary-600 h-2 rounded-full transition-all duration-1000"
-                      style={{ width: `${session.face_match_score || 0}%` }}
+                      style={{ width: `${session.face_match_score || session.faceMatchScore || 0}%` }}
                     />
                   </div>
                 </div>
@@ -670,13 +670,13 @@ export default function EkycPage() {
                   <div className="flex justify-between mb-2">
                     <span className="text-dark-700 dark:text-dark-300">Liveness Score</span>
                     <span className="font-bold text-dark-900 dark:text-white">
-                      {session.liveness_score ? `${session.liveness_score.toFixed(1)}%` : 'N/A'}
+                      {(session.liveness_score || session.livenessScore) ? `${(session.liveness_score || session.livenessScore)?.toFixed(1)}%` : 'N/A'}
                     </span>
                   </div>
                   <div className="w-full bg-dark-200 dark:bg-dark-700 rounded-full h-2">
                     <div 
                       className="bg-primary-600 h-2 rounded-full transition-all duration-1000"
-                      style={{ width: `${session.liveness_score || 0}%` }}
+                      style={{ width: `${session.liveness_score || session.livenessScore || 0}%` }}
                     />
                   </div>
                 </div>
@@ -685,15 +685,15 @@ export default function EkycPage() {
                   <div className="flex justify-between mb-2">
                     <span className="text-dark-700 dark:text-dark-300 font-semibold">Overall Score</span>
                     <span className="font-bold text-dark-900 dark:text-white">
-                      {session.overall_score ? `${session.overall_score.toFixed(1)}%` : 'N/A'}
+                      {(session.overall_score || session.overallScore) ? `${(session.overall_score || session.overallScore)?.toFixed(1)}%` : 'N/A'}
                     </span>
                   </div>
                   <div className="w-full bg-dark-200 dark:bg-dark-700 rounded-full h-2">
                     <div 
                       className={`h-2 rounded-full transition-all duration-1000 ${
-                        (session.overall_score || 0) >= 70 ? 'bg-green-600' : 'bg-yellow-600'
+                        (session.overall_score || session.overallScore || 0) >= 70 ? 'bg-green-600' : 'bg-yellow-600'
                       }`}
-                      style={{ width: `${session.overall_score || 0}%` }}
+                      style={{ width: `${session.overall_score || session.overallScore || 0}%` }}
                     />
                   </div>
                 </div>

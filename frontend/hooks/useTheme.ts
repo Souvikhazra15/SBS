@@ -3,20 +3,30 @@
 import { useEffect, useState } from 'react'
 
 export function useTheme() {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    // Check for saved theme preference or default to light
+    // Check for saved theme preference or default to dark
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     
-    const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light')
+    // Default to dark mode
+    const initialTheme = savedTheme || 'dark'
     setTheme(initialTheme)
     
+    // Ensure DOM is in sync
     if (initialTheme === 'dark') {
       document.documentElement.classList.add('dark')
+      document.documentElement.classList.remove('light')
+    } else {
+      document.documentElement.classList.remove('dark')
+      document.documentElement.classList.add('light')
+    }
+    
+    // Save preference if not set
+    if (!savedTheme) {
+      localStorage.setItem('theme', 'dark')
     }
   }, [])
 
@@ -27,8 +37,10 @@ export function useTheme() {
     
     if (newTheme === 'dark') {
       document.documentElement.classList.add('dark')
+      document.documentElement.classList.remove('light')
     } else {
       document.documentElement.classList.remove('dark')
+      document.documentElement.classList.add('light')
     }
   }
 

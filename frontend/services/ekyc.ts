@@ -49,19 +49,29 @@ axios.interceptors.response.use(
 
 export interface EkycSession {
   id: string;
-  user_id: string;
-  session_id: string;
+  user_id?: string;
+  userId?: string;
+  session_id?: string;
+  sessionId?: string;
   status: string;
   decision: string;
   document_score?: number;
+  documentScore?: number;
   face_match_score?: number;
+  faceMatchScore?: number;
   liveness_score?: number;
+  livenessScore?: number;
   overall_score?: number;
+  overallScore?: number;
   rejection_reason?: string;
+  rejectionReason?: string;
   review_notes?: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  createdAt?: string;
+  updated_at?: string;
+  updatedAt?: string;
   completed_at?: string;
+  completedAt?: string;
   documents: EkycDocument[];
   results: EkycResult[];
 }

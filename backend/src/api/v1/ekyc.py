@@ -648,7 +648,29 @@ async def run_ekyc_verification(
         
         result = await service.run_verification(session['id'])
         
-        return result
+        # Ensure proper field mapping for response
+        response_data = {
+            "id": result.get("id"),
+            "user_id": result.get("userId"),
+            "session_id": result.get("sessionId"),
+            "status": result.get("status"),
+            "decision": result.get("decision"),
+            "document_score": result.get("documentScore"),
+            "face_match_score": result.get("faceMatchScore"),
+            "liveness_score": result.get("livenessScore"),
+            "overall_score": result.get("overallScore"),
+            "rejection_reason": result.get("rejectionReason"),
+            "review_notes": result.get("reviewNotes"),
+            "created_at": result.get("createdAt"),
+            "updated_at": result.get("updatedAt"),
+            "completed_at": result.get("completedAt"),
+            "documents": result.get("documents", []),
+            "results": result.get("results", [])
+        }
+        
+        logger.info(f"[EKYC] Response scores: doc={response_data['document_score']}, face={response_data['face_match_score']}, liveness={response_data['liveness_score']}, overall={response_data['overall_score']}")
+        
+        return response_data
         
     except HTTPException:
         raise
@@ -684,7 +706,27 @@ async def get_ekyc_session(
                 detail="Session not found"
             )
         
-        return session
+        # Ensure proper field mapping for response
+        response_data = {
+            "id": session.get("id"),
+            "user_id": session.get("userId"),
+            "session_id": session.get("sessionId"),
+            "status": session.get("status"),
+            "decision": session.get("decision"),
+            "document_score": session.get("documentScore"),
+            "face_match_score": session.get("faceMatchScore"),
+            "liveness_score": session.get("livenessScore"),
+            "overall_score": session.get("overallScore"),
+            "rejection_reason": session.get("rejectionReason"),
+            "review_notes": session.get("reviewNotes"),
+            "created_at": session.get("createdAt"),
+            "updated_at": session.get("updatedAt"),
+            "completed_at": session.get("completedAt"),
+            "documents": session.get("documents", []),
+            "results": session.get("results", [])
+        }
+        
+        return response_data
         
     except HTTPException:
         raise
