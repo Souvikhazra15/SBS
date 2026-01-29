@@ -1,237 +1,354 @@
 """
-Face Matching Service
-
-Cutting-edge facial recognition technology for matching faces with government documents.
-Includes liveness detection and anti-spoofing measures.
+Face Matching Service using OpenCV with Advanced Feature Extraction
+Performs face detection and multi-method comparison for better accuracy
 """
-
-import base64
-import io
-import json
-import time
-from typing import Dict, Any, Optional, Tuple, List
-from PIL import Image
+import cv2
 import numpy as np
-from datetime import datetime
+from typing import Tuple, Optional, Dict, Any
+import logging
+import time
+
+logger = logging.getLogger(__name__)
 
 class FaceMatchingService:
-    """Service for facial recognition and matching using advanced biometric analysis."""
+    """Service for face detection and matching using OpenCV with multiple algorithms"""
+    
+    # Decision thresholds
+    MATCH_THRESHOLD = 0.60  # Combined similarity threshold for face match
+    
+    # Decision constants
+    DECISION_MATCH = "MATCH"
+    DECISION_NO_MATCH = "NO_MATCH"
+    DECISION_FACE_NOT_DETECTED = "FACE_NOT_DETECTED"
+    DECISION_MULTIPLE_FACES = "MULTIPLE_FACES"
+    DECISION_ERROR = "ERROR"
     
     def __init__(self):
-        self.model_version = "FaceNet-v3.2"
-        self.match_threshold = 0.75
-        self.liveness_threshold = 0.8
+        """Initialize face detection and feature extractors"""
+        self.model_name = "opencv_multi_algorithm"
         
-    def match_faces(self, document_image: str, selfie_image: str, 
-                   enable_liveness: bool = True) -> Dict[str, Any]:
+        # Face detection
+        self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        self.eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
+        
+        # Feature extractors for better matching
+        self.orb = cv2.ORB_create(nfeatures=500)  # For keypoint matching
+        
+        self.initialized = True
+        logger.info(f"[FACE] Enhanced face matching service initialized with multiple algorithms")
+        
+    def _load_image(self, image_bytes: bytes) -> Optional[np.ndarray]:
+        """Load image from bytes"""
+        try:
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if img is None:
+                logger.error("[FACE] Failed to decode image")
+                return None
+            return img
+        except Exception as e:
+            logger.error(f"[FACE] Error loading image: {e}")
+            return None
+    
+    def _detect_faces(self, img: np.ndarray) -> list:
+        """Detect faces in image using Haar Cascade with eye verification"""
+        try:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            
+            # Increase minNeighbors and minSize to reduce false positives
+            faces = self.face_cascade.detectMultiScale(
+                gray,
+                scaleFactor=1.2,
+                minNeighbors=8,
+                minSize=(80, 80),
+                flags=cv2.CASCADE_SCALE_IMAGE
+            )
+            
+            # Filter faces by detecting eyes (more reliable face confirmation)
+            valid_faces = []
+            for (x, y, w, h) in faces:
+                face_region = gray[y:y+h, x:x+w]
+                eyes = self.eye_cascade.detectMultiScale(face_region, scaleFactor=1.1, minNeighbors=3)
+                # If at least 1 eye detected, it's likely a real face
+                if len(eyes) >= 1:
+                    valid_faces.append((x, y, w, h))
+            
+            # If eye detection filtered out all faces, fall back to original detections
+            if len(valid_faces) == 0 and len(faces) > 0:
+                logger.warning("[FACE] Eye detection filtered all faces, using original detections")
+                valid_faces = list(faces)
+            
+            # If multiple faces detected, keep only the largest one
+            if len(valid_faces) > 1:
+                logger.warning(f"[FACE] Multiple faces detected ({len(valid_faces)}), selecting largest")
+                valid_faces = sorted(valid_faces, key=lambda f: f[2] * f[3], reverse=True)
+                valid_faces = [valid_faces[0]]
+            
+            return valid_faces
+        except Exception as e:
+            logger.error(f"[FACE] Error detecting faces: {e}")
+            return []
+    
+    def _preprocess_face(self, face_img: np.ndarray) -> np.ndarray:
+        """Preprocess face image for better matching"""
+        # Histogram equalization for better contrast
+        if len(face_img.shape) == 3:
+            # Convert to YUV and equalize Y channel
+            yuv = cv2.cvtColor(face_img, cv2.COLOR_BGR2YUV)
+            yuv[:,:,0] = cv2.equalizeHist(yuv[:,:,0])
+            face_img = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR)
+        else:
+            face_img = cv2.equalizeHist(face_img)
+        
+        # Denoise
+        face_img = cv2.fastNlMeansDenoisingColored(face_img, None, 10, 10, 7, 21)
+        
+        return face_img
+    
+    def _extract_face_region(self, img: np.ndarray, face_bbox: tuple) -> np.ndarray:
+        """Extract and preprocess face region from image"""
+        x, y, w, h = face_bbox
+        face_img = img[y:y+h, x:x+w]
+        
+        # Preprocess
+        face_img = self._preprocess_face(face_img)
+        
+        # Resize to standard size for comparison
+        face_img = cv2.resize(face_img, (128, 128))
+        return face_img
+    
+    def _compute_histogram_similarity(self, face1: np.ndarray, face2: np.ndarray) -> float:
+        """Compute similarity using histogram comparison"""
+        # Convert to HSV for better color comparison
+        hsv1 = cv2.cvtColor(face1, cv2.COLOR_BGR2HSV)
+        hsv2 = cv2.cvtColor(face2, cv2.COLOR_BGR2HSV)
+        
+        # Compute histograms
+        hist1 = cv2.calcHist([hsv1], [0, 1, 2], None, [8, 8, 8], [0, 180, 0, 256, 0, 256])
+        hist2 = cv2.calcHist([hsv2], [0, 1, 2], None, [8, 8, 8], [0, 180, 0, 256, 0, 256])
+        
+        # Normalize
+        cv2.normalize(hist1, hist1, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+        cv2.normalize(hist2, hist2, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+        
+        # Compare
+        similarity = cv2.compareHist(hist1, hist2, cv2.HISTCMP_CORREL)
+        
+        return float(similarity)
+    
+    def _compute_orb_similarity(self, face1: np.ndarray, face2: np.ndarray) -> float:
+        """Compute similarity using ORB keypoint matching"""
+        try:
+            gray1 = cv2.cvtColor(face1, cv2.COLOR_BGR2GRAY)
+            gray2 = cv2.cvtColor(face2, cv2.COLOR_BGR2GRAY)
+            
+            # Detect and compute ORB features
+            kp1, des1 = self.orb.detectAndCompute(gray1, None)
+            kp2, des2 = self.orb.detectAndCompute(gray2, None)
+            
+            if des1 is None or des2 is None or len(des1) < 10 or len(des2) < 10:
+                logger.warning("[FACE] Insufficient keypoints detected")
+                return 0.5  # Neutral score
+            
+            # Match features using BFMatcher
+            bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+            matches = bf.match(des1, des2)
+            
+            # Sort matches by distance
+            matches = sorted(matches, key=lambda x: x.distance)
+            
+            # Calculate similarity based on good matches
+            good_matches = [m for m in matches if m.distance < 50]
+            similarity = len(good_matches) / max(len(kp1), len(kp2))
+            
+            # Normalize to 0-1 range
+            similarity = min(1.0, similarity * 2)  # Scale up for better range
+            
+            return float(similarity)
+        except Exception as e:
+            logger.error(f"[FACE] Error in ORB matching: {e}")
+            return 0.5
+    
+    def _compute_ssim_similarity(self, face1: np.ndarray, face2: np.ndarray) -> float:
+        """Compute structural similarity (simplified SSIM)"""
+        gray1 = cv2.cvtColor(face1, cv2.COLOR_BGR2GRAY)
+        gray2 = cv2.cvtColor(face2, cv2.COLOR_BGR2GRAY)
+        
+        # Compute mean and variance
+        mean1, stddev1 = cv2.meanStdDev(gray1)
+        mean2, stddev2 = cv2.meanStdDev(gray2)
+        
+        # Compute correlation
+        correlation = np.corrcoef(gray1.flatten(), gray2.flatten())[0, 1]
+        
+        # Simple SSIM approximation
+        similarity = (2 * mean1 * mean2 + 0.01) / (mean1**2 + mean2**2 + 0.01)
+        similarity = similarity[0][0] * abs(correlation)
+        
+        return float(max(0, min(1, similarity)))
+    
+    def _compute_combined_similarity(self, face1: np.ndarray, face2: np.ndarray) -> Dict[str, float]:
+        """Compute combined similarity using multiple methods"""
+        # Histogram similarity (color/texture)
+        hist_sim = self._compute_histogram_similarity(face1, face2)
+        
+        # ORB keypoint similarity (structural features)
+        orb_sim = self._compute_orb_similarity(face1, face2)
+        
+        # SSIM-like similarity (overall structure)
+        ssim_sim = self._compute_ssim_similarity(face1, face2)
+        
+        # Weighted combination (histogram is most reliable with our setup)
+        combined = (hist_sim * 0.5) + (orb_sim * 0.3) + (ssim_sim * 0.2)
+        
+        return {
+            'histogram': hist_sim,
+            'orb_features': orb_sim,
+            'structural': ssim_sim,
+            'combined': combined
+        }
+    
+    def match_faces(
+        self,
+        id_image_bytes: bytes,
+        selfie_image_bytes: bytes
+    ) -> Dict[str, Any]:
         """
-        Match faces between document and selfie images.
+        Match faces from ID document and selfie
         
         Args:
-            document_image: Base64 encoded document image
-            selfie_image: Base64 encoded selfie image
-            enable_liveness: Whether to perform liveness detection
+            id_image_bytes: Bytes of ID card image
+            selfie_image_bytes: Bytes of selfie image
             
         Returns:
-            Dictionary containing match results
+            Dictionary containing:
+                - decision: MATCH, NO_MATCH, FACE_NOT_DETECTED, MULTIPLE_FACES, ERROR
+                - similarity_score: Similarity score (0.0 - 1.0)
+                - id_face_detected: Boolean
+                - selfie_face_detected: Boolean
+                - id_face_count: Number of faces in ID
+                - selfie_face_count: Number of faces in selfie
+                - processing_time: Processing time in milliseconds
+                - threshold: Threshold used for decision
+                - error: Error message if any
         """
         start_time = time.time()
         
+        result = {
+            "decision": self.DECISION_ERROR,
+            "similarity_score": 0.0,
+            "id_face_detected": False,
+            "selfie_face_detected": False,
+            "id_face_count": 0,
+            "selfie_face_count": 0,
+            "processing_time": 0,
+            "threshold": self.MATCH_THRESHOLD,
+            "error": None
+        }
+        
         try:
-            # Decode images
-            doc_image = self._decode_image(document_image)
-            selfie_img = self._decode_image(selfie_image)
+            # Load images
+            logger.info("[FACE] Loading ID image...")
+            id_img = self._load_image(id_image_bytes)
+            if id_img is None:
+                result["error"] = "Failed to load ID image"
+                result["decision"] = self.DECISION_ERROR
+                return result
             
-            # Extract faces
-            doc_face = self._extract_face(doc_image)
-            selfie_face = self._extract_face(selfie_img)
+            logger.info("[FACE] Loading selfie image...")
+            selfie_img = self._load_image(selfie_image_bytes)
+            if selfie_img is None:
+                result["error"] = "Failed to load selfie image"
+                result["decision"] = self.DECISION_ERROR
+                return result
             
-            if doc_face is None or selfie_face is None:
-                return self._create_error_response("Face not detected in one or both images")
+            # Detect faces in ID image
+            logger.info("[FACE] Detecting face in ID image...")
+            id_faces = self._detect_faces(id_img)
+            result["id_face_count"] = len(id_faces)
+            result["id_face_detected"] = len(id_faces) > 0
             
-            # Perform face matching
-            match_result = self._calculate_face_match(doc_face, selfie_face)
+            if len(id_faces) == 0:
+                logger.warning("[FACE] No face detected in ID image")
+                result["decision"] = self.DECISION_FACE_NOT_DETECTED
+                result["error"] = "No face detected in ID image"
+                return result
             
-            # Liveness detection (if enabled)
-            liveness_result = {}
-            if enable_liveness:
-                liveness_result = self._detect_liveness(selfie_img)
+            if len(id_faces) > 1:
+                logger.warning(f"[FACE] Multiple faces ({len(id_faces)}) detected in ID image")
+                result["decision"] = self.DECISION_MULTIPLE_FACES
+                result["error"] = f"Multiple faces ({len(id_faces)}) detected in ID image"
+                return result
             
-            # Quality assessment
-            quality_scores = self._assess_image_quality(doc_image, selfie_img)
+            logger.info("[FACE] ✓ ID face detected")
             
-            processing_time = int((time.time() - start_time) * 1000)
+            # Detect faces in selfie image
+            logger.info("[FACE] Detecting face in selfie image...")
+            selfie_faces = self._detect_faces(selfie_img)
+            result["selfie_face_count"] = len(selfie_faces)
+            result["selfie_face_detected"] = len(selfie_faces) > 0
             
-            return {
-                "face_match_score": match_result["match_score"],
-                "is_match": match_result["is_match"],
-                "confidence_level": match_result["confidence"],
-                "liveness_check": liveness_result,
-                "quality_assessment": quality_scores,
-                "biometric_features": {
-                    "face_detected_document": doc_face is not None,
-                    "face_detected_selfie": selfie_face is not None,
-                    "multiple_faces_document": False,  # Would be detected in _extract_face
-                    "multiple_faces_selfie": False
-                },
-                "processing_time_ms": processing_time,
-                "model_version": self.model_version,
-                "timestamp": datetime.utcnow().isoformat()
-            }
+            if len(selfie_faces) == 0:
+                logger.warning("[FACE] No face detected in selfie image")
+                result["decision"] = self.DECISION_FACE_NOT_DETECTED
+                result["error"] = "No face detected in selfie image"
+                return result
+            
+            if len(selfie_faces) > 1:
+                logger.warning(f"[FACE] Multiple faces ({len(selfie_faces)}) detected in selfie image")
+                result["decision"] = self.DECISION_MULTIPLE_FACES
+                result["error"] = f"Multiple faces ({len(selfie_faces)}) detected in selfie image"
+                return result
+            
+            logger.info("[FACE] ✓ Selfie face detected")
+            
+            # Extract face regions
+            logger.info("[FACE] Extracting and preprocessing face regions...")
+            id_face = self._extract_face_region(id_img, id_faces[0])
+            selfie_face = self._extract_face_region(selfie_img, selfie_faces[0])
+            
+            # Calculate similarity using multiple methods
+            logger.info("[FACE] Computing multi-algorithm face similarity...")
+            similarities = self._compute_combined_similarity(id_face, selfie_face)
+            
+            # Use combined score
+            similarity = similarities['combined']
+            result["similarity_score"] = similarity
+            
+            # Log individual scores
+            logger.info(f"[FACE] Histogram similarity: {similarities['histogram']:.4f}")
+            logger.info(f"[FACE] ORB features similarity: {similarities['orb_features']:.4f}")
+            logger.info(f"[FACE] Structural similarity: {similarities['structural']:.4f}")
+            logger.info(f"[FACE] Combined similarity score: {similarity:.4f}")
+            
+            # Make decision
+            if similarity >= self.MATCH_THRESHOLD:
+                result["decision"] = self.DECISION_MATCH
+                logger.info(f"[FACE] ✓ Decision: MATCH (similarity={similarity:.4f} >= threshold={self.MATCH_THRESHOLD})")
+            else:
+                result["decision"] = self.DECISION_NO_MATCH
+                logger.warning(f"[FACE] ✗ Decision: NO_MATCH (similarity={similarity:.4f} < threshold={self.MATCH_THRESHOLD})")
             
         except Exception as e:
-            return self._create_error_response(str(e), start_time)
-    
-    def _decode_image(self, image_data: str) -> np.ndarray:
-        """Decode base64 image to numpy array."""
-        if image_data.startswith('data:image'):
-            image_data = image_data.split(',')[1]
+            logger.error(f"[FACE] Error in face matching: {e}", exc_info=True)
+            result["error"] = str(e)
+            result["decision"] = self.DECISION_ERROR
         
-        image_bytes = base64.b64decode(image_data)
-        image = Image.open(io.BytesIO(image_bytes))
-        return np.array(image)
-    
-    def _extract_face(self, image: np.ndarray) -> Optional[Dict[str, Any]]:
-        """Extract face features and landmarks from image."""
-        # Simulate face detection and feature extraction
-        # In production, this would use libraries like dlib, OpenCV, or face_recognition
-        
-        # Simulate face detection (90% success rate)
-        if np.random.random() < 0.1:
-            return None  # Face not detected
-        
-        # Generate simulated face encoding (in production, this would be actual face embeddings)
-        face_encoding = np.random.random(128).tolist()  # 128-dimensional face encoding
-        
-        # Simulate facial landmarks (68-point landmarks)
-        landmarks = np.random.randint(0, min(image.shape[:2]), (68, 2)).tolist()
-        
-        return {
-            "encoding": face_encoding,
-            "landmarks": landmarks,
-            "bounding_box": [100, 100, 300, 300],  # x, y, width, height
-            "pose_angle": np.random.uniform(-15, 15),
-            "face_size": np.random.randint(150, 400)
-        }
-    
-    def _calculate_face_match(self, face1: Dict[str, Any], face2: Dict[str, Any]) -> Dict[str, Any]:
-        """Calculate similarity between two face encodings."""
-        # Simulate face comparison using cosine similarity
-        # In production, this would use actual face recognition algorithms
-        
-        encoding1 = np.array(face1["encoding"])
-        encoding2 = np.array(face2["encoding"])
-        
-        # Simulate distance calculation (lower = more similar)
-        distance = np.random.uniform(0.3, 1.2)
-        
-        # Convert distance to similarity score
-        similarity = max(0, 1 - distance)
-        match_score = similarity * 100
-        
-        # Determine if faces match based on threshold
-        is_match = similarity >= self.match_threshold
-        confidence = min(similarity / self.match_threshold, 1.0) if is_match else similarity
-        
-        return {
-            "match_score": round(match_score, 2),
-            "is_match": is_match,
-            "confidence": round(confidence * 100, 2),
-            "distance": round(distance, 4)
-        }
-    
-    def _detect_liveness(self, image: np.ndarray) -> Dict[str, Any]:
-        """Detect if the face in the image is from a live person."""
-        # Simulate liveness detection algorithms
-        # In production, this would analyze texture, motion, depth, etc.
-        
-        # Simulate various liveness indicators
-        texture_analysis = np.random.random() > 0.15  # Good texture indicates live face
-        eye_movement = np.random.random() > 0.2  # Eye movement detected
-        micro_expressions = np.random.random() > 0.25  # Natural micro-expressions
-        
-        # Calculate liveness score
-        liveness_indicators = [texture_analysis, eye_movement, micro_expressions]
-        liveness_score = sum(liveness_indicators) / len(liveness_indicators) * 100
-        
-        is_live = liveness_score >= (self.liveness_threshold * 100)
-        
-        # Spoof detection
-        print_attack_detected = np.random.random() < 0.05  # 5% chance of print attack
-        screen_attack_detected = np.random.random() < 0.03  # 3% chance of screen attack
-        mask_attack_detected = np.random.random() < 0.02  # 2% chance of mask attack
-        
-        spoof_detected = any([print_attack_detected, screen_attack_detected, mask_attack_detected])
-        
-        return {
-            "is_live": is_live and not spoof_detected,
-            "liveness_score": round(liveness_score, 2),
-            "confidence": round(liveness_score / 100.0, 2),
-            "spoof_detection": {
-                "spoof_detected": spoof_detected,
-                "print_attack": print_attack_detected,
-                "screen_attack": screen_attack_detected,
-                "mask_attack": mask_attack_detected
-            },
-            "liveness_indicators": {
-                "texture_quality": texture_analysis,
-                "eye_movement": eye_movement,
-                "micro_expressions": micro_expressions
-            }
-        }
-    
-    def _assess_image_quality(self, doc_image: np.ndarray, selfie_image: np.ndarray) -> Dict[str, Any]:
-        """Assess the quality of both images for face recognition."""
-        def calculate_quality(image: np.ndarray) -> Dict[str, float]:
-            # Simulate image quality metrics
-            return {
-                "brightness": round(np.random.uniform(0.3, 1.0), 2),
-                "contrast": round(np.random.uniform(0.4, 1.0), 2),
-                "sharpness": round(np.random.uniform(0.5, 1.0), 2),
-                "resolution": round(np.random.uniform(0.6, 1.0), 2),
-                "face_size": round(np.random.uniform(0.4, 1.0), 2)
-            }
-        
-        doc_quality = calculate_quality(doc_image)
-        selfie_quality = calculate_quality(selfie_image)
-        
-        # Overall quality scores
-        doc_overall = sum(doc_quality.values()) / len(doc_quality)
-        selfie_overall = sum(selfie_quality.values()) / len(selfie_quality)
-        
-        return {
-            "document_image": {
-                **doc_quality,
-                "overall_quality": round(doc_overall, 2)
-            },
-            "selfie_image": {
-                **selfie_quality,
-                "overall_quality": round(selfie_overall, 2)
-            },
-            "quality_sufficient": doc_overall > 0.6 and selfie_overall > 0.6
-        }
-    
-    def _create_error_response(self, error_message: str, start_time: Optional[float] = None) -> Dict[str, Any]:
-        """Create standardized error response."""
-        processing_time = 0
-        if start_time:
+        finally:
+            # Calculate processing time
             processing_time = int((time.time() - start_time) * 1000)
+            result["processing_time"] = processing_time
+            logger.info(f"[FACE] Processing completed in {processing_time}ms")
         
-        return {
-            "error": error_message,
-            "face_match_score": 0.0,
-            "is_match": False,
-            "confidence_level": 0.0,
-            "processing_time_ms": processing_time
-        }
-    
-    def get_model_info(self) -> Dict[str, Any]:
-        """Return information about the face matching model."""
-        return {
-            "model_version": self.model_version,
-            "match_threshold": self.match_threshold,
-            "liveness_threshold": self.liveness_threshold,
-            "supported_formats": ["jpeg", "png", "bmp"],
-            "max_image_size": "10MB",
-            "recommended_face_size": "150x150 pixels minimum"
-        }
+        return result
+
+
+# Global singleton instance
+_face_matching_service = None
+
+def get_face_matching_service() -> FaceMatchingService:
+    """Get or create the global face matching service instance"""
+    global _face_matching_service
+    if _face_matching_service is None:
+        _face_matching_service = FaceMatchingService()
+    return _face_matching_service

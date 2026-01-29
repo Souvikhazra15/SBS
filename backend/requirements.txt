@@ -22,6 +22,9 @@ paddlepaddle>=2.6.2
 paddleocr>=2.7.0.3
 scikit-image>=0.22.0
 scipy>=1.11.4
+# insightface>=0.7.3  # Commented out - requires C++ build tools on Windows
+# face-recognition>=1.3.0  # Commented out - requires CMake and C++ build tools
+# Using OpenCV Haar Cascade for face detection (no additional dependencies needed)
 
 # Deep Learning
 torch>=2.0.0

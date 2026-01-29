@@ -9,6 +9,42 @@ import axios from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+// Configure axios interceptor for JWT
+axios.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+      console.log('[AUTH] Token attached to request');
+    } else {
+      console.warn('[AUTH] No token found in localStorage');
+    }
+    return config;
+  },
+  (error) => {
+    console.error('[AUTH] Request interceptor error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Configure axios response interceptor for 401 handling
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      console.error('[AUTH] 401 Unauthorized - clearing token and redirecting');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      // Redirect to login
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login?error=session_expired';
+      }
+    }
+    console.error('[AUTH] Request failed:', error.response?.data || error.message);
+    return Promise.reject(error);
+  }
+);
+
 // ===== Types =====
 
 export interface EkycSession {
@@ -101,36 +137,41 @@ export const startEkycSession = async (): Promise<EkycSession> => {
 export const uploadDocument = async (
   sessionId: string,
   documentType: string,
-  frontImage: File,
-  backImage?: File
+  documentImage: File
 ): Promise<any> => {
   try {
-    const token = localStorage.getItem('token');
-    
     const formData = new FormData();
     formData.append('session_id', sessionId);
     formData.append('document_type', documentType);
-    formData.append('front_image', frontImage);
+    formData.append('document_image', documentImage);
     
-    if (backImage) {
-      formData.append('back_image', backImage);
-    }
+    console.log('[EKYC] Uploading document:', { sessionId, documentType, fileName: documentImage.name });
     
     const response = await axios.post(
       `${API_BASE_URL}/api/v1/e-kyc/upload-document`,
       formData,
       {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
         },
       }
     );
     
+    console.log('[EKYC] Document uploaded successfully:', response.data);
     return response.data;
   } catch (error: any) {
-    console.error('Failed to upload document:', error);
-    throw new Error(error.response?.data?.detail || 'Failed to upload document');
+    console.error('[EKYC] Failed to upload document:', error);
+    console.error('[EKYC] Error details:', error.response?.data);
+    
+    if (error.response?.status === 401) {
+      throw new Error('Authentication failed. Please log in again.');
+    }
+    
+    throw new Error(
+      error.response?.data?.detail ||
+      error.response?.data?.message ||
+      'Failed to upload document'
+    );
   }
 };
 
@@ -142,8 +183,6 @@ export const uploadSelfie = async (
   selfieImage: File
 ): Promise<any> => {
   try {
-    const token = localStorage.getItem('token');
-    
     const formData = new FormData();
     formData.append('session_id', sessionId);
     formData.append('selfie_image', selfieImage);
@@ -153,7 +192,6 @@ export const uploadSelfie = async (
       formData,
       {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
         },
       }
@@ -167,18 +205,89 @@ export const uploadSelfie = async (
 };
 
 /**
+ * Perform face matching between ID document and selfie
+ */
+export const matchFaces = async (
+  sessionId: string,
+  idImage: File,
+  selfieImage: File,
+  onProgress?: (status: string) => void
+): Promise<any> => {
+  try {
+    onProgress?.('Uploading images...');
+    
+    const formData = new FormData();
+    formData.append('session_id', sessionId);
+    formData.append('id_image', idImage);
+    formData.append('selfie_image', selfieImage);
+    
+    console.log('[FACE-MATCH] Sending face match request:', { sessionId });
+    
+    onProgress?.('Detecting faces...');
+    
+    const response = await axios.post(
+      `${API_BASE_URL}/api/v1/e-kyc/face-match`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    
+    console.log('[FACE-MATCH] Response:', response.data);
+    
+    onProgress?.('Matching...');
+    
+    // Check if face matching was successful
+    if (!response.data.success) {
+      const errorData = response.data;
+      throw {
+        message: errorData.error || 'Face matching failed',
+        code: errorData.error_code || errorData.decision,
+        details: errorData,
+        isApiError: true
+      };
+    }
+    
+    onProgress?.('Completed');
+    
+    return response.data;
+  } catch (error: any) {
+    console.error('[FACE-MATCH] Failed:', error);
+    
+    // If already formatted error, re-throw
+    if (error.isApiError) {
+      throw error;
+    }
+    
+    // Extract error details from axios error
+    const errorMessage = 
+      error.response?.data?.error ||
+      error.response?.data?.detail ||
+      error.message ||
+      'Face matching failed';
+    
+    const errorCode = error.response?.data?.error_code || error.response?.data?.decision;
+    
+    throw {
+      message: errorMessage,
+      code: errorCode,
+      details: error.response?.data
+    };
+  }
+};
+
+/**
  * Run e-KYC verification
  */
 export const runEkycVerification = async (sessionId: string): Promise<EkycSession> => {
   try {
-    const token = localStorage.getItem('token');
-    
     const response = await axios.post(
       `${API_BASE_URL}/api/v1/e-kyc/run`,
       { session_id: sessionId },
       {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       }
@@ -196,15 +305,8 @@ export const runEkycVerification = async (sessionId: string): Promise<EkycSessio
  */
 export const getEkycSession = async (sessionId: string): Promise<EkycSession> => {
   try {
-    const token = localStorage.getItem('token');
-    
     const response = await axios.get(
-      `${API_BASE_URL}/api/v1/e-kyc/${sessionId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      }
+      `${API_BASE_URL}/api/v1/e-kyc/${sessionId}`
     );
     
     return response.data;

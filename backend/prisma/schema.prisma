@@ -430,11 +430,16 @@ enum DocumentType {
   NATIONAL_ID
   RESIDENCE_PERMIT
   VOTER_ID
+  UTILITY_BILL
+  BANK_STATEMENT
+  AADHAAR
+  PAN_CARD
+  OTHER
 }
 
 model EkycSession {
   id                    String            @id @default(cuid())
-  userId                String
+  userId                String?           // Made optional for anonymous sessions
   sessionId             String            @unique @default(cuid())
   status                EkycStatus        @default(PENDING)
   decision              EkycDecision      @default(PENDING)
@@ -459,7 +464,7 @@ model EkycSession {
   completedAt           DateTime?
   
   // Relations
-  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                  User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
   documents             EkycDocument[]
   results               EkycResult[]
   
@@ -527,5 +532,39 @@ model EkycResult {
   @@index([sessionId])
   @@index([verificationType])
   @@map("ekyc_results")
+}
+
+// Face Matching Results
+model FaceMatchResult {
+  id                    String            @id @default(cuid())
+  sessionId             String
+  
+  // Face Detection Results
+  idFaceDetected        Boolean           @default(false)
+  selfieFaceDetected    Boolean           @default(false)
+  idFaceCount           Int?              // Number of faces detected in ID
+  selfieFaceCount       Int?              // Number of faces detected in selfie
+  
+  // Matching Results
+  similarityScore       Float             // Cosine similarity (0.0 - 1.0)
+  decision              String            // MATCH, NO_MATCH, FACE_NOT_DETECTED, MULTIPLE_FACES
+  threshold             Float             @default(0.65)
+  
+  // Processing Details
+  modelName             String            @default("insightface")
+  modelVersion          String?
+  processingTime        Int?              // milliseconds
+  
+  // Error Tracking
+  error                 String?
+  errorCode             String?
+  
+  // Metadata
+  createdAt             DateTime          @default(now())
+  
+  @@index([sessionId])
+  @@index([decision])
+  @@index([createdAt])
+  @@map("face_match_results")
 }
 

@@ -32,8 +32,7 @@ e-kyc/ID-Verification-OpenKYC/admin/
 e-kyc/ID-Verification-OpenKYC/app/
 node_modules/
 __pycache__/
-.next/
-# Media Files (Large)
+.next/# Media Files (Large)
 *.mp4
 *.avi
 *.mov

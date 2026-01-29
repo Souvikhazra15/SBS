@@ -77,12 +77,33 @@ class DeepfakeService:
             
             # Load model
             logger.info("[DEEPFAKE] Loading model weights...")
-            self.model = torch.load(
+            model_data = torch.load(
                 str(self.model_path),
                 map_location=self.device
             )
-            self.model.eval()  # Set to evaluation mode
-            self.model.to(self.device)
+            
+            # Handle different model save formats
+            if isinstance(model_data, dict):
+                # If it's a state dict, we need the model architecture
+                if 'state_dict' in model_data:
+                    # TODO: Need to create model architecture and load state_dict
+                    logger.warning("[DEEPFAKE] Model is a state dict, need architecture definition")
+                    self.model = None
+                    return
+                elif 'model' in model_data:
+                    self.model = model_data['model']
+                else:
+                    # Try to use it as state dict directly
+                    logger.warning("[DEEPFAKE] Model format not recognized, skipping")
+                    self.model = None
+                    return
+            else:
+                # Assume it's the model itself
+                self.model = model_data
+            
+            if self.model is not None:
+                self.model.eval()  # Set to evaluation mode
+                self.model.to(self.device)
             
             logger.info(f"[DEEPFAKE] ✓ Model loaded successfully on {self.device}")
             

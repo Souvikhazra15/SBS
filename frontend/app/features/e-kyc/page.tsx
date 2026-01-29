@@ -1,9 +1,18 @@
 'use client'
 
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Card } from '@/components/Card'
 import { CheckCircleIcon, ArrowLeftIcon } from '@/components/icons/Icons'
+import {
+  startEkycSession,
+  uploadDocument,
+  uploadSelfie,
+  matchFaces,
+  runEkycVerification,
+  type EkycSession,
+} from '@/services/ekyc'
 
 // Upload icon component
 const UploadIcon = ({ className }: { className?: string }) => (
@@ -19,49 +28,59 @@ const CameraIcon = ({ className }: { className?: string }) => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
   </svg>
 )
-import {
-  startEkycSession,
-  uploadDocument,
-  uploadSelfie,
-  runEkycVerification,
-  getEkycSession,
-  type EkycSession,
-} from '@/services/ekyc'
 
 type Step = 'document' | 'selfie' | 'processing' | 'result'
 
 export default function EkycPage() {
+  const router = useRouter()
+  
+  // Flow state - NO AUTH REQUIRED
   const [currentStep, setCurrentStep] = useState<Step>('document')
   const [session, setSession] = useState<EkycSession | null>(null)
-  const [documentType, setDocumentType] = useState('PASSPORT')
-  const [frontImage, setFrontImage] = useState<File | null>(null)
-  const [backImage, setBackImage] = useState<File | null>(null)
+  const [documentType, setDocumentType] = useState('AADHAAR')
+  const [documentImage, setDocumentImage] = useState<File | null>(null)
   const [selfieImage, setSelfieImage] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [extractedData, setExtractedData] = useState<any>(null)
+  const [showWebcam, setShowWebcam] = useState(false)
+  const [stream, setStream] = useState<MediaStream | null>(null)
+  const [faceMatchStatus, setFaceMatchStatus] = useState<string>('')
   
-  const frontInputRef = useRef<HTMLInputElement>(null)
-  const backInputRef = useRef<HTMLInputElement>(null)
+  const documentInputRef = useRef<HTMLInputElement>(null)
   const selfieInputRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  // Initialize session
-  const initializeSession = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-      const newSession = await startEkycSession()
-      setSession(newSession)
-    } catch (err: any) {
-      setError(err.message || 'Failed to start e-KYC session')
-    } finally {
-      setIsLoading(false)
+  // Auto-start session on mount - NO AUTH CHECK
+  useEffect(() => {
+    if (!session && currentStep === 'document' && !isLoading) {
+      const initSession = async () => {
+        try {
+          console.log('[EKYC] Auto-creating session (no auth required)...')
+          const newSession = await startEkycSession()
+          console.log('[EKYC] Full session object:', newSession)
+          console.log('[EKYC] Session ID field:', newSession.session_id, '|', newSession.sessionId)
+          setSession(newSession)
+        } catch (err: any) {
+          console.error('[EKYC] Failed to create session:', err)
+          setError('Failed to initialize verification session. Please refresh the page.')
+        }
+      }
+      
+      initSession()
     }
-  }
+  }, [session, currentStep, isLoading])
 
   // Handle document upload
   const handleDocumentUpload = async () => {
-    if (!frontImage) {
-      setError('Please upload at least the front of your document')
+    if (!documentImage) {
+      setError('Please upload your document')
+      return
+    }
+
+    if (!session) {
+      setError('Session not initialized. Please refresh the page.')
       return
     }
 
@@ -69,58 +88,186 @@ export default function EkycPage() {
       setIsLoading(true)
       setError(null)
 
-      // Initialize session if not exists
-      if (!session) {
-        await initializeSession()
-      }
-
-      if (session) {
-        await uploadDocument(session.session_id, documentType, frontImage, backImage || undefined)
+      console.log('[EKYC] Full session object before upload:', session)
+      console.log('[EKYC] Uploading document with session_id:', session.session_id, 'or sessionId:', session?.sessionId)
+      console.log('[EKYC] Document type:', documentType)
+      const result = await uploadDocument(session.session_id || session.sessionId, documentType, documentImage)
+      setExtractedData(result)
+      console.log('[EKYC] Document uploaded successfully')
+      
+      // Auto-advance to selfie
+      setTimeout(() => {
         setCurrentStep('selfie')
-      }
+      }, 1500)
     } catch (err: any) {
-      setError(err.message || 'Failed to upload document')
+      console.error('[EKYC] Document upload error:', err)
+      setError(err.message || 'Failed to upload document. Please try again.')
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Handle selfie upload
+  // Handle selfie upload with face matching
   const handleSelfieUpload = async () => {
     if (!selfieImage) {
       setError('Please capture a selfie')
       return
     }
 
+    if (!documentImage) {
+      setError('Document image not found. Please restart the process.')
+      return
+    }
+
+    if (!session) {
+      setError('Session not found. Please restart the process.')
+      return
+    }
+
     try {
       setIsLoading(true)
       setError(null)
+      setCurrentStep('processing')
+      setFaceMatchStatus('Uploading images...')
 
-      if (session) {
-        await uploadSelfie(session.session_id, selfieImage)
-        setCurrentStep('processing')
-        
-        // Run verification
-        const result = await runEkycVerification(session.session_id)
-        setSession(result)
-        setCurrentStep('result')
+      console.log('[FACE-MATCH] Starting face matching...')
+      
+      // Perform face matching
+      const faceMatchResult = await matchFaces(
+        session.session_id,
+        documentImage,
+        selfieImage,
+        (status) => {
+          setFaceMatchStatus(status)
+        }
+      )
+      
+      console.log('[FACE-MATCH] Result:', faceMatchResult)
+      
+      if (!faceMatchResult.success) {
+        throw new Error(faceMatchResult.error || 'Face matching failed')
       }
+      
+      setFaceMatchStatus('Face matched successfully!')
+      
+      // Upload selfie after successful face match
+      console.log('[EKYC] Uploading selfie...')
+      await uploadSelfie(session.session_id, selfieImage)
+      console.log('[EKYC] Selfie uploaded, running verification...')
+      
+      // Run verification
+      const result = await runEkycVerification(session.session_id)
+      setSession(result)
+      console.log('[EKYC] Verification complete:', result.decision)
+      
+      setCurrentStep('result')
     } catch (err: any) {
-      setError(err.message || 'Failed to process verification')
+      console.error('[EKYC] Verification error:', err)
+      setCurrentStep('selfie') // Go back to selfie
+      
+      // Handle specific face matching errors
+      if (err.code === 'FACE_NOT_DETECTED') {
+        setError('No face detected in one or both images. Please ensure your face is clearly visible and try again.')
+      } else if (err.code === 'MULTIPLE_FACES') {
+        setError('Multiple faces detected. Please ensure only your face is visible in the photo.')
+      } else if (err.code === 'NO_MATCH') {
+        setError('Face does not match the ID photo. Please ensure good lighting and face the camera directly, then try again.')
+      } else {
+        setError(err.message || 'Failed to process verification. Please try again.')
+      }
     } finally {
       setIsLoading(false)
+      setFaceMatchStatus('')
     }
   }
 
   // Restart process
-  const handleRestart = () => {
+  const handleRestart = async () => {
+    stopWebcam()
     setCurrentStep('document')
-    setSession(null)
-    setFrontImage(null)
-    setBackImage(null)
+    setDocumentImage(null)
     setSelfieImage(null)
     setError(null)
+    setExtractedData(null)
+    setShowWebcam(false)
+    
+    // Create new session
+    try {
+      const newSession = await startEkycSession()
+      setSession(newSession)
+      console.log('[EKYC] New session created:', newSession.session_id)
+    } catch (err) {
+      console.error('[EKYC] Failed to create new session:', err)
+    }
   }
+
+  // Webcam functions
+  const startWebcam = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false 
+      })
+      setStream(mediaStream)
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream
+        // Ensure video plays
+        videoRef.current.play().catch(err => {
+          console.error('Error playing video:', err)
+        })
+      }
+      setShowWebcam(true)
+      setError(null)
+    } catch (err) {
+      console.error('Error accessing webcam:', err)
+      setError('Failed to access webcam. Please check your camera permissions.')
+    }
+  }
+
+  const stopWebcam = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop())
+      setStream(null)
+    }
+    setShowWebcam(false)
+  }
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.drawImage(video, 0, 0)
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' })
+            setSelfieImage(file)
+            stopWebcam()
+          }
+        }, 'image/jpeg', 0.95)
+      }
+    }
+  }
+
+  // Connect stream to video element when it changes
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream
+    }
+  }, [stream])
+
+  // Cleanup webcam on unmount
+  useEffect(() => {
+    return () => {
+      stopWebcam()
+    }
+  }, [])
 
   const getStepStatus = (step: Step) => {
     const steps: Step[] = ['document', 'selfie', 'processing', 'result']
@@ -131,6 +278,8 @@ export default function EkycPage() {
     if (stepIndex === currentIndex) return 'active'
     return 'pending'
   }
+
+  // No authentication barriers - show interface directly
 
   return (
     <div className="min-h-screen bg-white dark:bg-dark-900 transition-colors">
@@ -200,10 +349,19 @@ export default function EkycPage() {
           </div>
         </div>
 
-        {/* Error Display */}
+        {/* Inline Error Display */}
         {error && (
-          <div className="mb-8 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 max-w-4xl mx-auto">
-            {error}
+          <div className="mb-8 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg max-w-4xl mx-auto flex items-start gap-3">
+            <span className="text-red-600 dark:text-red-400 text-xl">⚠️</span>
+            <div className="flex-1">
+              <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
+              <button
+                onClick={() => setError(null)}
+                className="text-sm text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 mt-2"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
 
@@ -213,6 +371,15 @@ export default function EkycPage() {
             <h2 className="text-2xl font-bold text-dark-900 dark:text-white mb-6">Upload Identity Document</h2>
             
             <div className="space-y-6">
+              {/* Session Info */}
+              {session && session.session_id && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm">
+                  <p className="text-blue-700 dark:text-blue-300">
+                    ✓ Session active: <span className="font-mono">{session.session_id.slice(0, 8)}...</span>
+                  </p>
+                </div>
+              )}
+
               {/* Document Type Selection */}
               <div>
                 <label className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-2">
@@ -221,82 +388,85 @@ export default function EkycPage() {
                 <select
                   value={documentType}
                   onChange={(e) => setDocumentType(e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg border border-dark-300 dark:border-dark-600 bg-white dark:bg-dark-800 text-dark-900 dark:text-white"
+                  className="w-full px-4 py-2 rounded-lg border border-dark-300 dark:border-dark-600 bg-white dark:bg-dark-800 text-dark-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none"
+                  disabled={isLoading}
                 >
-                  <option value="PASSPORT">Passport</option>
-                  <option value="DRIVERS_LICENSE">Driver's License</option>
-                  <option value="NATIONAL_ID">National ID</option>
-                  <option value="RESIDENCE_PERMIT">Residence Permit</option>
-                  <option value="VOTER_ID">Voter ID</option>
+                  <option value="AADHAAR">Aadhaar Card</option>
+                  <option value="PAN_CARD">PAN Card</option>
+                  <option value="DRIVERS_LICENSE">Driving License</option>
                 </select>
               </div>
 
-              {/* Front Image Upload */}
+              {/* Document Image Upload */}
               <div>
                 <label className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-2">
-                  Front of Document *
+                  Document Image *
                 </label>
                 <div 
-                  onClick={() => frontInputRef.current?.click()}
+                  onClick={() => documentInputRef.current?.click()}
                   className="border-2 border-dashed border-dark-300 dark:border-dark-600 rounded-lg p-8 text-center cursor-pointer hover:border-primary-500 transition-colors"
                 >
-                  {frontImage ? (
+                  {documentImage ? (
                     <div>
-                      <p className="text-green-600 dark:text-green-400 font-medium">{frontImage.name}</p>
+                      <p className="text-green-600 dark:text-green-400 font-medium">✓ {documentImage.name}</p>
                       <p className="text-sm text-dark-600 dark:text-dark-400 mt-1">Click to change</p>
                     </div>
                   ) : (
                     <div>
                       <UploadIcon className="w-12 h-12 mx-auto mb-4 text-dark-400" />
-                      <p className="text-dark-600 dark:text-dark-400">Click to upload front of document</p>
+                      <p className="text-dark-600 dark:text-dark-400">Click to upload your document</p>
+                      <p className="text-sm text-dark-500 dark:text-dark-500 mt-2">Supported: JPG, PNG (max 10MB)</p>
                     </div>
                   )}
                 </div>
                 <input
-                  ref={frontInputRef}
+                  ref={documentInputRef}
                   type="file"
                   accept="image/*"
-                  onChange={(e) => setFrontImage(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      if (file.size > 10 * 1024 * 1024) {
+                        setError('File too large. Maximum size is 10MB.')
+                        return
+                      }
+                      setDocumentImage(file)
+                      setError(null)
+                    }
+                  }}
                   className="hidden"
                 />
               </div>
 
-              {/* Back Image Upload (Optional) */}
-              <div>
-                <label className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-2">
-                  Back of Document (Optional)
-                </label>
-                <div 
-                  onClick={() => backInputRef.current?.click()}
-                  className="border-2 border-dashed border-dark-300 dark:border-dark-600 rounded-lg p-8 text-center cursor-pointer hover:border-primary-500 transition-colors"
-                >
-                  {backImage ? (
-                    <div>
-                      <p className="text-green-600 dark:text-green-400 font-medium">{backImage.name}</p>
-                      <p className="text-sm text-dark-600 dark:text-dark-400 mt-1">Click to change</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <UploadIcon className="w-12 h-12 mx-auto mb-4 text-dark-400" />
-                      <p className="text-dark-600 dark:text-dark-400">Click to upload back of document</p>
-                    </div>
-                  )}
+              {/* Show extracted data if available */}
+              {extractedData && (
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg animate-fade-in">
+                  <h3 className="font-semibold text-green-900 dark:text-green-100 mb-2">✓ Document Processed Successfully</h3>
+                  <div className="text-sm text-green-800 dark:text-green-200 space-y-1">
+                    {extractedData.name && <p><strong>Name:</strong> {extractedData.name}</p>}
+                    {extractedData.fatherName && <p><strong>Father's Name:</strong> {extractedData.fatherName}</p>}
+                    {extractedData.dateOfBirth && <p><strong>Date of Birth:</strong> {extractedData.dateOfBirth}</p>}
+                    {extractedData.documentNumber && <p><strong>Document Number:</strong> {extractedData.documentNumber}</p>}
+                    {extractedData.confidence && (
+                      <p><strong>Confidence:</strong> {(extractedData.confidence * 100).toFixed(1)}%</p>
+                    )}
+                  </div>
                 </div>
-                <input
-                  ref={backInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setBackImage(e.target.files?.[0] || null)}
-                  className="hidden"
-                />
-              </div>
+              )}
 
               <button
                 onClick={handleDocumentUpload}
-                disabled={isLoading || !frontImage}
-                className="w-full px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoading || !documentImage || !session}
+                className="w-full px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {isLoading ? 'Uploading...' : 'Continue to Selfie'}
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                    Processing Document...
+                  </>
+                ) : (
+                  'Continue to Selfie →'
+                )}
               </button>
             </div>
           </Card>
@@ -308,48 +478,97 @@ export default function EkycPage() {
             <h2 className="text-2xl font-bold text-dark-900 dark:text-white mb-6">Capture Selfie</h2>
             
             <div className="space-y-6">
-              <p className="text-dark-600 dark:text-dark-400">
-                Please take a clear selfie to match with your document photo.
-              </p>
-
-              <div 
-                onClick={() => selfieInputRef.current?.click()}
-                className="border-2 border-dashed border-dark-300 dark:border-dark-600 rounded-lg p-12 text-center cursor-pointer hover:border-primary-500 transition-colors"
-              >
-                {selfieImage ? (
-                  <div>
-                    <p className="text-green-600 dark:text-green-400 font-medium">{selfieImage.name}</p>
-                    <p className="text-sm text-dark-600 dark:text-dark-400 mt-1">Click to retake</p>
-                  </div>
-                ) : (
-                  <div>
-                    <CameraIcon className="w-16 h-16 mx-auto mb-4 text-dark-400" />
-                    <p className="text-dark-600 dark:text-dark-400">Click to capture selfie</p>
-                  </div>
-                )}
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  📸 Please take a clear selfie to match with your document photo. Ensure good lighting and face the camera directly.
+                </p>
               </div>
-              <input
-                ref={selfieInputRef}
-                type="file"
-                accept="image/*"
-                capture="user"
-                onChange={(e) => setSelfieImage(e.target.files?.[0] || null)}
-                className="hidden"
-              />
+
+              {/* Webcam View */}
+              {showWebcam ? (
+                <div className="space-y-4">
+                  <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '4/3' }}>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={capturePhoto}
+                      className="flex-1 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <CameraIcon className="w-5 h-5" />
+                      Capture Photo
+                    </button>
+                    <button
+                      onClick={stopWebcam}
+                      className="px-6 py-3 border border-dark-300 dark:border-dark-600 text-dark-700 dark:text-dark-300 font-semibold rounded-lg hover:bg-dark-50 dark:hover:bg-dark-800 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : selfieImage ? (
+                <div>
+                  <div className="border-2 border-green-500 rounded-lg p-8 text-center bg-green-50 dark:bg-green-900/20">
+                    <div className="text-green-600 dark:text-green-400 mb-4">
+                      <CheckCircleIcon className="w-16 h-16 mx-auto" />
+                    </div>
+                    <p className="text-green-600 dark:text-green-400 font-medium text-lg">Selfie Captured Successfully!</p>
+                    <p className="text-sm text-dark-600 dark:text-dark-400 mt-2">{selfieImage.name}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelfieImage(null)
+                      startWebcam()
+                    }}
+                    className="mt-4 w-full px-6 py-3 border border-dark-300 dark:border-dark-600 text-dark-700 dark:text-dark-300 font-semibold rounded-lg hover:bg-dark-50 dark:hover:bg-dark-800 transition-colors"
+                  >
+                    Retake Photo
+                  </button>
+                </div>
+              ) : (
+                <div 
+                  onClick={startWebcam}
+                  className="border-2 border-dashed border-dark-300 dark:border-dark-600 rounded-lg p-12 text-center cursor-pointer hover:border-primary-500 transition-colors"
+                >
+                  <CameraIcon className="w-16 h-16 mx-auto mb-4 text-dark-400" />
+                  <p className="text-dark-600 dark:text-dark-400 font-medium">Click to capture selfie</p>
+                  <p className="text-sm text-dark-500 dark:text-dark-500 mt-2">Use your device camera</p>
+                </div>
+              )}
+
+              {/* Hidden canvas for photo capture */}
+              <canvas ref={canvasRef} className="hidden" />
 
               <div className="flex gap-4">
                 <button
-                  onClick={() => setCurrentStep('document')}
-                  className="flex-1 px-6 py-3 border border-dark-300 dark:border-dark-600 text-dark-700 dark:text-dark-300 font-semibold rounded-lg hover:bg-dark-50 dark:hover:bg-dark-800 transition-colors"
+                  onClick={() => {
+                    stopWebcam()
+                    setCurrentStep('document')
+                  }}
+                  disabled={isLoading}
+                  className="flex-1 px-6 py-3 border border-dark-300 dark:border-dark-600 text-dark-700 dark:text-dark-300 font-semibold rounded-lg hover:bg-dark-50 dark:hover:bg-dark-800 transition-colors disabled:opacity-50"
                 >
-                  Back
+                  ← Back
                 </button>
                 <button
                   onClick={handleSelfieUpload}
                   disabled={isLoading || !selfieImage}
-                  className="flex-1 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {isLoading ? 'Processing...' : 'Verify Identity'}
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                      Processing...
+                    </>
+                  ) : (
+                    'Verify Identity →'
+                  )}
                 </button>
               </div>
             </div>
@@ -361,34 +580,55 @@ export default function EkycPage() {
           <Card className="max-w-4xl mx-auto p-12 text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary-600 border-t-transparent mx-auto mb-6"></div>
             <h2 className="text-2xl font-bold text-dark-900 dark:text-white mb-4">Processing Verification</h2>
-            <p className="text-dark-600 dark:text-dark-400">
+            
+            {/* Show face matching status */}
+            {faceMatchStatus && (
+              <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-blue-700 dark:text-blue-300 font-medium">
+                  {faceMatchStatus}
+                </p>
+              </div>
+            )}
+            
+            <p className="text-dark-600 dark:text-dark-400 mb-2">
               Please wait while we verify your documents and identity...
+            </p>
+            <div className="text-sm text-dark-500 dark:text-dark-500 space-y-1 mt-4">
+              <p className="flex items-center justify-center gap-2">
+                {faceMatchStatus.includes('Uploading') ? '⏳' : faceMatchStatus.includes('Detecting') ? '🔍' : faceMatchStatus.includes('Matching') ? '🎯' : '✓'} 
+                Face Detection & Matching
+              </p>
+              <p>🔒 Liveness Detection</p>
+              <p>📊 Risk Assessment</p>
+            </div>
+            <p className="text-xs text-dark-500 dark:text-dark-500 mt-4">
+              This may take 10-30 seconds
             </p>
           </Card>
         )}
 
         {/* Step 4: Results */}
         {currentStep === 'result' && session && (
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
             {/* Decision Card */}
-            <Card className={`p-8 text-center ${
+            <Card className={`p-8 text-center border-2 ${
               session.decision === 'APPROVED' ? 'bg-green-50 dark:bg-green-900/20 border-green-500' :
               session.decision === 'REJECTED' ? 'bg-red-50 dark:bg-red-900/20 border-red-500' :
               'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-500'
             }`}>
-              <div className="text-6xl mb-4">
+              <div className="text-6xl mb-4 animate-bounce-in">
                 {session.decision === 'APPROVED' ? '✅' :
                  session.decision === 'REJECTED' ? '❌' : '⚠️'}
               </div>
-              <h2 className="text-3xl font-bold mb-4">
-                {session.decision === 'APPROVED' ? 'Verification Approved' :
+              <h2 className="text-3xl font-bold mb-4 text-dark-900 dark:text-white">
+                {session.decision === 'APPROVED' ? 'Verification Approved!' :
                  session.decision === 'REJECTED' ? 'Verification Rejected' :
                  'Manual Review Required'}
               </h2>
-              <p className="text-lg text-dark-600 dark:text-dark-400">
-                {session.decision === 'APPROVED' ? 'Your identity has been successfully verified!' :
-                 session.decision === 'REJECTED' ? 'We were unable to verify your identity. Please try again.' :
-                 'Your verification requires manual review. We\'ll notify you once complete.'}
+              <p className="text-lg text-dark-600 dark:text-dark-400 max-w-2xl mx-auto">
+                {session.decision === 'APPROVED' ? 'Your identity has been successfully verified. You can now access all services.' :
+                 session.decision === 'REJECTED' ? (session.rejection_reason || 'We were unable to verify your identity. Please try again with clearer images.') :
+                 'Your verification requires manual review by our team. We\'ll notify you once the review is complete.'}
               </p>
             </Card>
 
@@ -400,12 +640,12 @@ export default function EkycPage() {
                   <div className="flex justify-between mb-2">
                     <span className="text-dark-700 dark:text-dark-300">Document Score</span>
                     <span className="font-bold text-dark-900 dark:text-white">
-                      {session.document_score?.toFixed(1) || 'N/A'}%
+                      {session.document_score ? `${session.document_score.toFixed(1)}%` : 'N/A'}
                     </span>
                   </div>
                   <div className="w-full bg-dark-200 dark:bg-dark-700 rounded-full h-2">
                     <div 
-                      className="bg-primary-600 h-2 rounded-full transition-all"
+                      className="bg-primary-600 h-2 rounded-full transition-all duration-1000"
                       style={{ width: `${session.document_score || 0}%` }}
                     />
                   </div>
@@ -415,12 +655,12 @@ export default function EkycPage() {
                   <div className="flex justify-between mb-2">
                     <span className="text-dark-700 dark:text-dark-300">Face Match Score</span>
                     <span className="font-bold text-dark-900 dark:text-white">
-                      {session.face_match_score?.toFixed(1) || 'N/A'}%
+                      {session.face_match_score ? `${session.face_match_score.toFixed(1)}%` : 'N/A'}
                     </span>
                   </div>
                   <div className="w-full bg-dark-200 dark:bg-dark-700 rounded-full h-2">
                     <div 
-                      className="bg-primary-600 h-2 rounded-full transition-all"
+                      className="bg-primary-600 h-2 rounded-full transition-all duration-1000"
                       style={{ width: `${session.face_match_score || 0}%` }}
                     />
                   </div>
@@ -430,12 +670,12 @@ export default function EkycPage() {
                   <div className="flex justify-between mb-2">
                     <span className="text-dark-700 dark:text-dark-300">Liveness Score</span>
                     <span className="font-bold text-dark-900 dark:text-white">
-                      {session.liveness_score?.toFixed(1) || 'N/A'}%
+                      {session.liveness_score ? `${session.liveness_score.toFixed(1)}%` : 'N/A'}
                     </span>
                   </div>
                   <div className="w-full bg-dark-200 dark:bg-dark-700 rounded-full h-2">
                     <div 
-                      className="bg-primary-600 h-2 rounded-full transition-all"
+                      className="bg-primary-600 h-2 rounded-full transition-all duration-1000"
                       style={{ width: `${session.liveness_score || 0}%` }}
                     />
                   </div>
@@ -443,14 +683,16 @@ export default function EkycPage() {
 
                 <div>
                   <div className="flex justify-between mb-2">
-                    <span className="text-dark-700 dark:text-dark-300">Overall Score</span>
+                    <span className="text-dark-700 dark:text-dark-300 font-semibold">Overall Score</span>
                     <span className="font-bold text-dark-900 dark:text-white">
-                      {session.overall_score?.toFixed(1) || 'N/A'}%
+                      {session.overall_score ? `${session.overall_score.toFixed(1)}%` : 'N/A'}
                     </span>
                   </div>
                   <div className="w-full bg-dark-200 dark:bg-dark-700 rounded-full h-2">
                     <div 
-                      className="bg-green-600 h-2 rounded-full transition-all"
+                      className={`h-2 rounded-full transition-all duration-1000 ${
+                        (session.overall_score || 0) >= 70 ? 'bg-green-600' : 'bg-yellow-600'
+                      }`}
                       style={{ width: `${session.overall_score || 0}%` }}
                     />
                   </div>

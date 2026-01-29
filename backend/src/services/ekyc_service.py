@@ -510,74 +510,86 @@ class EkycService:
         try:
             logger.info(f"[EKYC] Starting verification for session: {session_id}")
             
-            # Update status to processing
-            await self.db.ekycsession.update({
-                "where": {"sessionId": session_id},
-                "data": {"status": EkycStatusEnum.PROCESSING}
-            })
-            
-            # Fetch session with documents
-            session = await self.db.ekycsession.find_unique({
-                "where": {"sessionId": session_id},
-                "include": {
-                    "documents": True,
-                    "results": True,
-                }
-            })
-            
-            if not session:
-                raise ValueError(f"Session not found: {session_id}")
+            async with self.db_pool.acquire() as conn:
+                # Update status to processing
+                await conn.execute(
+                    'UPDATE "ekyc_sessions" SET status = $1, "updatedAt" = $2 WHERE "sessionId" = $3',
+                    EkycStatusEnum.PROCESSING,
+                    datetime.utcnow(),
+                    session_id
+                )
+                
+                # Fetch session with documents
+                session = await conn.fetchrow(
+                    'SELECT * FROM "ekyc_sessions" WHERE "sessionId" = $1',
+                    session_id
+                )
+                
+                if not session:
+                    raise ValueError(f"Session not found: {session_id}")
+                
+                session_dict = dict(session)
             
             # Simulate verification processes (in production, call actual verification services)
             # 1. Document Authentication
-            document_score = await self._verify_document_authenticity(session)
+            document_score = await self._verify_document_authenticity(session_dict)
             logger.info(f"[EKYC] Document verification complete: {document_score}")
             
             # 2. Face Matching
-            face_match_score = await self._verify_face_match(session)
+            face_match_score = await self._verify_face_match(session_dict)
             logger.info(f"[EKYC] Face matching complete: {face_match_score}")
             
             # 3. Liveness Detection
-            liveness_score = await self._verify_liveness(session)
+            liveness_score = await self._verify_liveness(session_dict)
             logger.info(f"[EKYC] Liveness detection complete: {liveness_score}")
             
             # Calculate overall score and decision
             overall_score = (document_score + face_match_score + liveness_score) / 3
             decision = self._make_decision(overall_score, document_score, face_match_score, liveness_score)
             
-            # Update session with results
-            updated_session = await self.db.ekycsession.update({
-                "where": {"sessionId": session_id},
-                "data": {
-                    "status": EkycStatusEnum.COMPLETED,
-                    "decision": decision,
-                    "documentScore": document_score,
-                    "faceMatchScore": face_match_score,
-                    "livenessScore": liveness_score,
-                    "overallScore": overall_score,
-                    "completedAt": datetime.utcnow(),
-                },
-                "include": {
-                    "documents": True,
-                    "results": True,
-                }
-            })
+            async with self.db_pool.acquire() as conn:
+                # Update session with results
+                await conn.execute(
+                    '''UPDATE "ekyc_sessions" 
+                       SET status = $1, decision = $2, "documentScore" = $3, 
+                           "faceMatchScore" = $4, "livenessScore" = $5, "overallScore" = $6,
+                           "completedAt" = $7, "updatedAt" = $8
+                       WHERE "sessionId" = $9''',
+                    EkycStatusEnum.COMPLETED,
+                    decision,
+                    document_score,
+                    face_match_score,
+                    liveness_score,
+                    overall_score,
+                    datetime.utcnow(),
+                    datetime.utcnow(),
+                    session_id
+                )
+                
+                # Fetch updated session
+                updated_session = await conn.fetchrow(
+                    'SELECT * FROM "ekyc_sessions" WHERE "sessionId" = $1',
+                    session_id
+                )
             
             logger.info(f"[EKYC] Verification completed: {session_id}, Decision: {decision}")
             logger.info(f"[EKYC] Saved to DB: Session {session_id}")
             
-            return updated_session
+            return dict(updated_session)
             
         except Exception as e:
             logger.error(f"[EKYC] Verification failed: {str(e)}")
             # Update session to failed status
-            await self.db.ekycsession.update({
-                "where": {"sessionId": session_id},
-                "data": {
-                    "status": EkycStatusEnum.FAILED,
-                    "rejectionReason": str(e),
-                }
-            })
+            async with self.db_pool.acquire() as conn:
+                await conn.execute(
+                    '''UPDATE "ekyc_sessions" 
+                       SET status = $1, "rejectionReason" = $2, "updatedAt" = $3
+                       WHERE "sessionId" = $4''',
+                    EkycStatusEnum.FAILED,
+                    str(e),
+                    datetime.utcnow(),
+                    session_id
+                )
             raise
 
     async def _verify_document_authenticity(self, session: Dict[str, Any]) -> float:
@@ -594,18 +606,23 @@ class EkycService:
         score = 92.5
         
         # Save result
-        await self.db.ekycresult.create({
-            "data": {
-                "sessionId": session.id,
-                "verificationType": "document_auth",
-                "score": score,
-                "isPassed": score >= 70,
-                "confidence": 0.95,
-                "details": {"method": "ml_classifier", "checks": ["hologram", "security_features", "tampering"]},
-                "modelVersion": "v1.0.0",
-                "processingTime": 500,
-            }
-        })
+        async with self.db_pool.acquire() as conn:
+            await conn.execute(
+                '''INSERT INTO "ekyc_results" 
+                   (id, "sessionId", "verificationType", score, "isPassed", confidence, 
+                    details, "modelVersion", "processingTime", "processedAt")
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)''',
+                str(uuid.uuid4()),
+                session["id"],
+                "document_auth",
+                score,
+                score >= 70,
+                0.95,
+                '{"method": "ml_classifier", "checks": ["hologram", "security_features", "tampering"]}',
+                "v1.0.0",
+                500,
+                datetime.utcnow()
+            )
         
         return score
 
@@ -619,18 +636,23 @@ class EkycService:
         
         score = 89.3
         
-        await self.db.ekycresult.create({
-            "data": {
-                "sessionId": session.id,
-                "verificationType": "face_match",
-                "score": score,
-                "isPassed": score >= 75,
-                "confidence": 0.91,
-                "details": {"similarity": score, "landmarks_matched": 68},
-                "modelVersion": "v1.0.0",
-                "processingTime": 500,
-            }
-        })
+        async with self.db_pool.acquire() as conn:
+            await conn.execute(
+                '''INSERT INTO "ekyc_results" 
+                   (id, "sessionId", "verificationType", score, "isPassed", confidence, 
+                    details, "modelVersion", "processingTime", "processedAt")
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)''',
+                str(uuid.uuid4()),
+                session["id"],
+                "face_match",
+                score,
+                score >= 75,
+                0.91,
+                '{"similarity": ' + str(score) + ', "landmarks_matched": 68}',
+                "v1.0.0",
+                500,
+                datetime.utcnow()
+            )
         
         return score
 
@@ -644,18 +666,23 @@ class EkycService:
         
         score = 94.7
         
-        await self.db.ekycresult.create({
-            "data": {
-                "sessionId": session.id,
-                "verificationType": "liveness",
-                "score": score,
-                "isPassed": score >= 80,
-                "confidence": 0.96,
-                "details": {"method": "depth_analysis", "frames_analyzed": 30},
-                "modelVersion": "v1.0.0",
-                "processingTime": 500,
-            }
-        })
+        async with self.db_pool.acquire() as conn:
+            await conn.execute(
+                '''INSERT INTO "ekyc_results" 
+                   (id, "sessionId", "verificationType", score, "isPassed", confidence, 
+                    details, "modelVersion", "processingTime", "processedAt")
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)''',
+                str(uuid.uuid4()),
+                session["id"],
+                "liveness",
+                score,
+                score >= 80,
+                0.96,
+                '{"method": "depth_analysis", "frames_analyzed": 30}',
+                "v1.0.0",
+                500,
+                datetime.utcnow()
+            )
         
         return score
 
@@ -699,14 +726,32 @@ class EkycService:
             Session with documents and results, or None
         """
         try:
-            session = await self.db.ekycsession.find_unique({
-                "where": {"sessionId": session_id},
-                "include": {
-                    "documents": True,
-                    "results": True,
-                }
-            })
-            return session
+            async with self.db_pool.acquire() as conn:
+                session = await conn.fetchrow(
+                    'SELECT * FROM "ekyc_sessions" WHERE "sessionId" = $1',
+                    session_id
+                )
+                
+                if not session:
+                    return None
+                
+                session_dict = dict(session)
+                
+                # Fetch documents
+                documents = await conn.fetch(
+                    'SELECT * FROM "ekyc_documents" WHERE "sessionId" = $1',
+                    session_dict['id']
+                )
+                session_dict['documents'] = [dict(d) for d in documents]
+                
+                # Fetch results
+                results = await conn.fetch(
+                    'SELECT * FROM "ekyc_results" WHERE "sessionId" = $1',
+                    session_dict['id']
+                )
+                session_dict['results'] = [dict(r) for r in results]
+                
+                return session_dict
         except Exception as e:
             logger.error(f"[EKYC] Failed to fetch session: {str(e)}")
             return None

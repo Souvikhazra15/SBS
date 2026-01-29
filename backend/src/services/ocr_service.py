@@ -47,7 +47,7 @@ class OCRService:
 
     def preprocess_image(self, image_data: bytes) -> np.ndarray:
         """
-        Preprocess image for better OCR results
+        Preprocess image for better OCR results - Enhanced for Indian ID cards
         
         Args:
             image_data: Raw image bytes
@@ -65,11 +65,25 @@ class OCRService:
             
             logger.info(f"[OCR] Image decoded: {image.shape}")
             
+            # Resize if too large (keep aspect ratio)
+            max_dimension = 2000
+            height, width = image.shape[:2]
+            if max(height, width) > max_dimension:
+                scale = max_dimension / max(height, width)
+                new_width = int(width * scale)
+                new_height = int(height * scale)
+                image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+                logger.info(f"[OCR] Image resized to {new_width}x{new_height}")
+            
             # Convert to grayscale
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             
+            # Enhance contrast using CLAHE (Contrast Limited Adaptive Histogram Equalization)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(gray)
+            
             # Apply bilateral filter to reduce noise while preserving edges
-            denoised = cv2.bilateralFilter(gray, 9, 75, 75)
+            denoised = cv2.bilateralFilter(enhanced, 9, 75, 75)
             
             # Apply adaptive thresholding
             binary = cv2.adaptiveThreshold(
@@ -104,11 +118,15 @@ class OCRService:
                     )
                     logger.info(f"[OCR] Image deskewed by {angle:.2f} degrees")
             
-            # Sharpen the image
-            kernel = np.array([[-1,-1,-1],
-                             [-1, 9,-1],
-                             [-1,-1,-1]])
-            sharpened = cv2.filter2D(binary, -1, kernel)
+            # Morphological operations to clean up text
+            kernel = np.ones((1, 1), np.uint8)
+            opening = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel, iterations=1)
+            
+            # Sharpen the image for better text clarity
+            sharpen_kernel = np.array([[-1, -1, -1],
+                                      [-1,  9, -1],
+                                      [-1, -1, -1]])
+            sharpened = cv2.filter2D(opening, -1, sharpen_kernel)
             
             logger.info("[OCR] Image preprocessing complete")
             return sharpened

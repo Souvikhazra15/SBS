@@ -13,10 +13,14 @@ from passlib.context import CryptContext
 import secrets
 
 # Configuration
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
+SECRET_KEY = os.getenv("JWT_SECRET", os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32)))
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 30
+
+# Setup logging
+import logging
+logger = logging.getLogger(__name__)
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -86,34 +90,41 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
+        detail={"error": "invalid_token", "message": "Could not validate credentials"},
         headers={"WWW-Authenticate": "Bearer"},
     )
     
     try:
         # Extract token
         token = credentials.credentials
+        logger.info(f"[AUTH] Token received: {token[:20]}...")
         
         # Verify token
         payload = AuthService.verify_token(token, "access")
         if payload is None:
+            logger.error("[AUTH] Token verification failed: invalid or expired")
             raise credentials_exception
         
         # Extract user info
         user_id: str = payload.get("sub")
         if user_id is None:
+            logger.error("[AUTH] Token missing 'sub' claim")
             raise credentials_exception
         
-        # In production, you would fetch full user data from database
-        # For now, return minimal user info from token
-        return {
+        user_data = {
             "id": user_id,
             "email": payload.get("email"),
             "role": payload.get("role", "USER"),
             "status": payload.get("status", "ACTIVE")
         }
         
-    except Exception:
+        logger.info(f"[AUTH] User validated: {user_id}")
+        return user_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[AUTH] Authentication error: {str(e)}")
         raise credentials_exception
 
 async def get_current_active_user(current_user: dict = Depends(get_current_user)):

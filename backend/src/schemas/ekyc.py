@@ -66,63 +66,66 @@ class EkycRunRequest(BaseModel):
 class EkycDocumentResponse(BaseModel):
     """E-KYC document response"""
     id: str
-    session_id: str
+    session_id: str = Field(..., alias="sessionId")
     type: str
-    front_image_url: str
-    back_image_url: Optional[str]
-    document_number: Optional[str]
-    full_name: Optional[str]
-    date_of_birth: Optional[str]
-    expiry_date: Optional[str]
-    issuing_country: Optional[str]
-    is_authentic: Optional[bool]
-    confidence_score: Optional[float]
-    tampering_detected: bool
-    uploaded_at: datetime
-    processed_at: Optional[datetime]
+    front_image_url: str = Field(..., alias="frontImageUrl")
+    back_image_url: Optional[str] = Field(None, alias="backImageUrl")
+    document_number: Optional[str] = Field(None, alias="documentNumber")
+    full_name: Optional[str] = Field(None, alias="fullName")
+    date_of_birth: Optional[str] = Field(None, alias="dateOfBirth")
+    expiry_date: Optional[str] = Field(None, alias="expiryDate")
+    issuing_country: Optional[str] = Field(None, alias="issuingCountry")
+    is_authentic: Optional[bool] = Field(None, alias="isAuthentic")
+    confidence_score: Optional[float] = Field(None, alias="confidenceScore")
+    tampering_detected: bool = Field(..., alias="tamperingDetected")
+    uploaded_at: datetime = Field(..., alias="uploadedAt")
+    processed_at: Optional[datetime] = Field(None, alias="processedAt")
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 
 class EkycResultResponse(BaseModel):
     """E-KYC verification result response"""
     id: str
-    session_id: str
-    verification_type: str
+    session_id: str = Field(..., alias="sessionId")
+    verification_type: str = Field(..., alias="verificationType")
     score: float
-    is_passed: bool
+    is_passed: bool = Field(..., alias="isPassed")
     confidence: Optional[float]
     details: Optional[Dict[str, Any]]
-    model_version: Optional[str]
-    processed_at: datetime
-    processing_time: Optional[int]
+    model_version: Optional[str] = Field(None, alias="modelVersion")
+    processed_at: datetime = Field(..., alias="processedAt")
+    processing_time: Optional[int] = Field(None, alias="processingTime")
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 
 class EkycSessionResponse(BaseModel):
     """E-KYC session response"""
     id: str
-    user_id: str
-    session_id: str
+    user_id: Optional[str] = Field(None, alias="userId")
+    session_id: str = Field(..., alias="sessionId")
     status: str
     decision: str
-    document_score: Optional[float]
-    face_match_score: Optional[float]
-    liveness_score: Optional[float]
-    overall_score: Optional[float]
-    rejection_reason: Optional[str]
-    review_notes: Optional[str]
-    created_at: datetime
-    updated_at: datetime
-    completed_at: Optional[datetime]
+    document_score: Optional[float] = Field(None, alias="documentScore")
+    face_match_score: Optional[float] = Field(None, alias="faceMatchScore")
+    liveness_score: Optional[float] = Field(None, alias="livenessScore")
+    overall_score: Optional[float] = Field(None, alias="overallScore")
+    rejection_reason: Optional[str] = Field(None, alias="rejectionReason")
+    review_notes: Optional[str] = Field(None, alias="reviewNotes")
+    created_at: datetime = Field(..., alias="createdAt")
+    updated_at: datetime = Field(..., alias="updatedAt")
+    completed_at: Optional[datetime] = Field(None, alias="completedAt")
     documents: List[EkycDocumentResponse] = []
     results: List[EkycResultResponse] = []
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 
 class EkycSessionHistoryResponse(BaseModel):

@@ -33,6 +33,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import aiofiles
 import asyncpg
+import ssl
 
 # Global database pool
 db_pool = None
@@ -44,13 +45,19 @@ async def lifespan(app: FastAPI):
     
     # Startup
     try:
+        # Configure SSL context for Windows
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
         # Connect to database
         database_url = os.getenv("DATABASE_URL")
         db_pool = await asyncpg.create_pool(
             database_url,
             min_size=1,
             max_size=10,
-            command_timeout=60
+            command_timeout=60,
+            ssl=ssl_context
         )
         
         # Set the pool for prisma module
@@ -100,10 +107,12 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:3001",
+        "http://127.0.0.1:3000",
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Global exception handler
