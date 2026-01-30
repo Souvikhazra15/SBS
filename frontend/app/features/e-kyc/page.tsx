@@ -91,7 +91,11 @@ export default function EkycPage() {
       console.log('[EKYC] Full session object before upload:', session)
       console.log('[EKYC] Uploading document with session_id:', session.session_id, 'or sessionId:', session?.sessionId)
       console.log('[EKYC] Document type:', documentType)
-      const result = await uploadDocument(session.session_id || session.sessionId, documentType, documentImage)
+      const sessionId = session.session_id || session.sessionId
+      if (!sessionId) {
+        throw new Error('Session ID is missing')
+      }
+      const result = await uploadDocument(sessionId, documentType, documentImage)
       setExtractedData(result)
       console.log('[EKYC] Document uploaded successfully')
       
@@ -132,9 +136,14 @@ export default function EkycPage() {
 
       console.log('[FACE-MATCH] Starting face matching...')
       
+      const sessionId = session.session_id || session.sessionId
+      if (!sessionId) {
+        throw new Error('Session ID is missing')
+      }
+      
       // Perform face matching
       const faceMatchResult = await matchFaces(
-        session.session_id,
+        sessionId,
         documentImage,
         selfieImage,
         (status) => {
@@ -152,11 +161,11 @@ export default function EkycPage() {
       
       // Upload selfie after successful face match
       console.log('[EKYC] Uploading selfie...')
-      await uploadSelfie(session.session_id, selfieImage)
+      await uploadSelfie(sessionId, selfieImage)
       console.log('[EKYC] Selfie uploaded, running verification...')
       
       // Run verification
-      const result = await runEkycVerification(session.session_id)
+      const result = await runEkycVerification(sessionId)
       setSession(result)
       console.log('[EKYC] Verification complete:', result.decision)
       

@@ -192,60 +192,59 @@ class FakeDocumentService:
             hologram_check = self._check_hologram_presence(image)
             paper_check = self._check_paper_texture(image)
             
-            # STRICT SCORING SYSTEM (Much harder to pass)
+            # REALISTIC SCORING SYSTEM (Balanced for real-world documents)
             score = 0
             critical_issues = []
             
-            # 1. QR Code presence (15 points) - Don't require data validation
+            # 1. QR Code presence (10 points) - Optional bonus, not critical
             if qr_check["detected"]:
-                score += 15
+                score += 10
                 if qr_check["valid"]:
-                    score += 5  # Bonus if we can validate data
-            else:
-                critical_issues.append("QR code not detected")
+                    score += 5  # Extra bonus if we can validate data
+            # QR not detected is NOT a critical issue (photos may not capture it)
             
-            # 2. Government header must be present (20 points)
+            # 2. Government header (25 points) - Most important check
             if header_check["valid"]:
-                score += 20
+                score += 25
             else:
                 critical_issues.append("Government header missing or incorrect")
             
-            # 3. All 4 critical fields must be present (25 points)
+            # 3. Critical fields present (30 points) - Very important
             critical_fields = layout_check.get("critical_fields_found", 0)
-            if critical_fields == 4:
-                score += 25
-            elif critical_fields == 3:
+            if critical_fields >= 3:
+                score += 30  # 3 or 4 fields is good enough
+            elif critical_fields == 2:
                 score += 20
-                critical_issues.append("One field missing")
+                critical_issues.append("Only 2 critical fields found")
             else:
-                critical_issues.append(f"Missing fields: {4 - critical_fields}")
+                critical_issues.append(f"Missing critical fields: {4 - critical_fields}")
             
-            # 4. Color scheme (10 points) - Optional bonus
+            # 4. Color scheme (8 points) - Bonus only, photos may not capture colors
             if color_check["valid"]:
-                score += 10
+                score += 8
             
-            # 5. Paper texture and quality (5 points) - Optional bonus
+            # 5. Paper texture and quality (5 points) - Bonus only
             if paper_check["valid"]:
                 score += 5
             
-            # 6. Hologram presence (5 points) - Optional bonus
+            # 6. Hologram presence (5 points) - Bonus only
             if hologram_check["detected"]:
                 score += 5
             
-            # 7. Tampering check (10 points)
+            # 7. Tampering check (12 points) - Important but not critical
             if tampering_check["is_clear"]:
+                score += 12
+            # Blurry photos are common, not marking as critical issue
+            
+            # 8. Face photo presence (10 points) - Important indicator
+            if face_check["face_detected"]:
                 score += 10
             else:
-                critical_issues.append("Document appears tampered or low quality")
+                critical_issues.append("Face photo not clearly detected")
             
-            # 8. Face photo presence (5 points)
-            if face_check["face_detected"]:
-                score += 5
-            else:
-                critical_issues.append("Face photo not detected")
-            
-            # BALANCED THRESHOLD: Score >= 70 OR (score >= 60 with <= 2 critical issues)
-            is_authentic = (score >= 70) or (score >= 60 and len(critical_issues) <= 2)
+            # LENIENT THRESHOLD: Score >= 55 with max 2 critical issues = AUTHENTIC
+            # This allows real documents with poor quality scans to pass
+            is_authentic = (score >= 55 and len(critical_issues) <= 2) or (score >= 65)
             
             return {
                 "forgery_score": round(score, 2),
@@ -272,7 +271,7 @@ class FakeDocumentService:
                     "tampering_analysis": tampering_check,
                     "face_detection": face_check
                 },
-                "status": "AUTHENTIC" if is_authentic else "SUSPICIOUS" if score >= 60 else "FAKE"
+                "status": "AUTHENTIC" if is_authentic else "SUSPICIOUS" if score >= 40 else "FAKE"
             }
             
         except Exception as e:
@@ -548,7 +547,7 @@ class FakeDocumentService:
                 gray = image
             
             lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-            is_clear = lap_var > 80  # Threshold for clarity
+            is_clear = lap_var > 50  # Lowered threshold - many real photos are slightly blurry
             
             return {
                 "is_clear": is_clear,
@@ -575,9 +574,9 @@ class FakeDocumentService:
             
             faces = self.face_cascade.detectMultiScale(
                 gray,
-                scaleFactor=1.1,
-                minNeighbors=4,
-                minSize=(50, 50)
+                scaleFactor=1.05,  # More sensitive to smaller variations
+                minNeighbors=3,     # Reduced from 4 - more lenient
+                minSize=(40, 40)    # Smaller minimum size to catch smaller faces
             )
             
             return {
@@ -640,8 +639,9 @@ class FakeDocumentService:
             mask = cv2.inRange(hsv, lower_orange, upper_orange)
             orange_percentage = (np.sum(mask > 0) / mask.size) * 100
             
-            # Authentic Aadhaar should have at least 5% orange in header
-            valid = orange_percentage >= 5.0
+            # Authentic Aadhaar should have at least 3% orange in header
+            # Lowered from 5% - photos/scans may not capture colors perfectly
+            valid = orange_percentage >= 3.0
             
             return {
                 "valid": valid,
