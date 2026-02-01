@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Ethics & Bias Disclosure{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12 text-center mb-4">
+            <h2><i class="fas fa-balance-scale"></i> Ethics & Bias Disclosure Panel</h2>
+            <p class="text-muted">Transparency in AI-Assisted Deepfake Detection</p>
+        </div>
+    </div>
+
+    <!-- Summary Card -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5><i class="fas fa-exclamation-triangle"></i> Important Summary</h5>
+                </div>
+                <div class="card-body">
+                    <pre class="summary-text">{{ summary }}</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dataset Information -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5><i class="fas fa-database"></i> Dataset Sources</h5>
+                </div>
+                <div class="card-body">
+                    <p>This model was trained on the following datasets:</p>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Dataset</th>
+                                    <th>Description</th>
+                                    <th>Size</th>
+                                    <th>Manipulation Types</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for source in panel.dataset_info.sources %}
+                                <tr>
+                                    <td><strong>{{ source.name }}</strong></td>
+                                    <td>{{ source.description }}</td>
+                                    <td>{{ source.size }}</td>
+                                    <td>
+                                        {% for manip in source.manipulations %}
+                                        <span class="badge badge-secondary">{{ manip }}</span>
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bias Risks -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5><i class="fas fa-exclamation-circle"></i> Known Bias Risks</h5>
+                </div>
+                <div class="card-body">
+                    {% for bias in panel.bias_risks %}
+                    <div class="bias-item mb-4">
+                        <h6>
+                            <span class="badge 
+                                {% if bias.severity == 'high' %}badge-danger
+                                {% elif bias.severity == 'medium' %}badge-warning
+                                {% else %}badge-info{% endif %}">
+                                {{ bias.severity|upper }}
+                            </span>
+                            {{ bias.category }}
+                        </h6>
+                        <p class="mb-2">{{ bias.description }}</p>
+                        <p class="small text-success mb-0">
+                            <i class="fas fa-shield-alt"></i> <strong>Mitigation:</strong> {{ bias.mitigation }}
+                        </p>
+                    </div>
+                    <hr>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- False Positive Scenarios -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5><i class="fas fa-search"></i> Potential False Positive Scenarios</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">These scenarios may trigger false positives (authentic content flagged as fake):</p>
+                    <div class="accordion" id="fpAccordion">
+                        {% for fp in panel.false_positive_scenarios %}
+                        <div class="card">
+                            <div class="card-header" id="heading{{ forloop.counter }}">
+                                <h2 class="mb-0">
+                                    <button class="btn btn-link collapsed" type="button" 
+                                            data-toggle="collapse" data-target="#collapse{{ forloop.counter }}">
+                                        {{ fp.scenario }}
+                                    </button>
+                                </h2>
+                            </div>
+                            <div id="collapse{{ forloop.counter }}" class="collapse" data-parent="#fpAccordion">
+                                <div class="card-body">
+                                    <p>{{ fp.description }}</p>
+                                    <p class="mb-0 text-primary">
+                                        <i class="fas fa-lightbulb"></i> <strong>Recommendation:</strong> 
+                                        {{ fp.recommendation }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5><i class="fas fa-ban"></i> System Limitations</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="limitations-list">
+                        {% for limitation in panel.limitations %}
+                        <li>{{ limitation }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5><i class="fas fa-check-circle"></i> Responsible Use Guidelines</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="guidelines-list">
+                        {% for guideline in panel.responsible_use_guidelines %}
+                        <li>{{ guideline }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-dark">
+                <div class="card-header bg-dark text-white">
+                    <h5><i class="fas fa-gavel"></i> Legal Disclaimer</h5>
+                </div>
+                <div class="card-body">
+                    <pre class="disclaimer-text">{{ panel.disclaimer }}</pre>
+                </div>
+                <div class="card-footer text-muted text-center">
+                    Last Updated: {{ panel.last_updated }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div class="row">
+        <div class="col-12 text-center">
+            <a href="{% url 'ml_app:explainability_dashboard' %}" class="btn btn-primary btn-lg">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.summary-text, .disclaimer-text {
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 0.9rem;
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 5px;
+    margin: 0;
+}
+
+.limitations-list, .guidelines-list {
+    padding-left: 20px;
+}
+
+.limitations-list li, .guidelines-list li {
+    margin-bottom: 10px;
+}
+
+.bias-item h6 {
+    margin-bottom: 10px;
+}
+
+.accordion .btn-link {
+    text-decoration: none;
+    color: #333;
+    width: 100%;
+    text-align: left;
+}
+
+.accordion .btn-link:hover {
+    text-decoration: none;
+    color: #007bff;
+}
+</style>
+{% endblock %}

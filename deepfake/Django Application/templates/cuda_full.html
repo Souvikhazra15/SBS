@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% load static %}
+{%block content%}
+<div class="container">
+    <div class="logo text-center mb-3">
+        <img src="{% static 'images/logo1.png'%}" alt="Logo" >
+    </div>
+    <hr />
+    <div class="alert alert-danger" role="alert">
+        <h4 class="alert-heading">GPU Memory Error</h4>
+        <p>
+            <strong>Server is out of GPU memory.</strong> Please try again with:
+        </p>
+        <ul>
+            <li>Fewer frames (e.g., 20 or 40 instead of 100)</li>
+            <li>A shorter video file</li>
+            <li>Close other GPU applications</li>
+        </ul>
+        <hr>
+        <p class="mb-0">
+            <a href="{% url 'ml_app:home' %}" class="btn btn-primary">Try Again</a>
+        </p>
+    </div>
+</div>
+{%endblock%}

@@ -1,0 +1,413 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Forensics Investigation Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="text-center mb-4">
+                <i class="fas fa-microscope"></i> Deepfake Forensics Investigation Dashboard
+            </h2>
+            <p class="text-center text-muted lead">
+                "This is not a classifier, it's an investigation tool."
+            </p>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <!-- Case Summary -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5><i class="fas fa-folder-open"></i> Case Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>File:</strong> {{ video_name|default:"No file loaded" }}</p>
+                            <p><strong>Analysis Time:</strong> <span id="analysis-time">-</span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Frames Analyzed:</strong> <span id="frames-analyzed">-</span></p>
+                            <p><strong>Faces Detected:</strong> <span id="faces-detected">-</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overall Score -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h4>Overall Forensics Score</h4>
+                    <div class="score-circle" id="overall-score-circle">
+                        <span id="overall-score">-</span>
+                    </div>
+                    <p class="small text-muted mt-2">Higher score indicates higher authenticity likelihood</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h4>Forensics Summary</h4>
+                    <pre id="forensics-summary" class="summary-box">Loading analysis...</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Metrics -->
+    <div class="row mb-4">
+        <!-- Face Consistency -->
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card metric-card">
+                <div class="card-header">
+                    <i class="fas fa-user-circle"></i> Face Consistency
+                </div>
+                <div class="card-body">
+                    <div class="metric-gauge">
+                        <canvas id="gauge-face" width="150" height="100"></canvas>
+                        <div class="gauge-value" id="face-value">-</div>
+                    </div>
+                    <div class="metric-details">
+                        <p class="small">Measures how consistent facial features are across frames.</p>
+                        <p class="small"><strong>Low score:</strong> Face may be swapped or manipulated</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Eye Blink Pattern -->
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card metric-card">
+                <div class="card-header">
+                    <i class="fas fa-eye"></i> Eye Blink Pattern
+                </div>
+                <div class="card-body">
+                    <div class="metric-gauge">
+                        <canvas id="gauge-blink" width="150" height="100"></canvas>
+                        <div class="gauge-value" id="blink-value">-</div>
+                    </div>
+                    <div class="metric-details">
+                        <p class="small">Analyzes natural blinking patterns.</p>
+                        <p class="small"><strong>Abnormal:</strong> Deepfakes often have unnatural blink rates</p>
+                        <p class="small">Blink rate: <span id="blink-rate">-</span> blinks/min</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Temporal Stability -->
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card metric-card">
+                <div class="card-header">
+                    <i class="fas fa-clock"></i> Temporal Stability
+                </div>
+                <div class="card-body">
+                    <div class="metric-gauge">
+                        <canvas id="gauge-temporal" width="150" height="100"></canvas>
+                        <div class="gauge-value" id="temporal-value">-</div>
+                    </div>
+                    <div class="metric-details">
+                        <p class="small">Measures frame-to-frame consistency.</p>
+                        <p class="small"><strong>Low stability:</strong> Flickering or jittering may indicate manipulation</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compression Artifacts -->
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card metric-card">
+                <div class="card-header">
+                    <i class="fas fa-compress"></i> Compression Artifacts
+                </div>
+                <div class="card-body">
+                    <div class="metric-gauge">
+                        <canvas id="gauge-artifacts" width="150" height="100"></canvas>
+                        <div class="gauge-value" id="artifacts-value">-</div>
+                    </div>
+                    <div class="metric-details">
+                        <p class="small">Detects blocking and frequency anomalies.</p>
+                        <p class="small"><strong>High artifacts:</strong> May indicate re-encoding after manipulation</p>
+                        <p class="small">Blockiness: <span id="blockiness-value">-</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Analysis -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-bar"></i> Detailed Analysis</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="analysis-table">
+                            <thead>
+                                <tr>
+                                    <th>Metric</th>
+                                    <th>Value</th>
+                                    <th>Status</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="analysis-tbody">
+                                <tr>
+                                    <td colspan="4" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <button class="btn btn-primary btn-lg" onclick="runForensics()">
+                <i class="fas fa-sync"></i> Re-run Analysis
+            </button>
+            <button class="btn btn-secondary btn-lg" onclick="downloadReport()">
+                <i class="fas fa-download"></i> Download Report
+            </button>
+            <a href="{% url 'ml_app:explainability_dashboard' %}" class="btn btn-info btn-lg">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js_scripts %}
+<script>
+const videoPath = '{{ video_path|default:"" }}';
+
+function drawGauge(canvasId, value, color) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height;
+    const radius = 60;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Background arc
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, Math.PI, 0, false);
+    ctx.lineWidth = 15;
+    ctx.strokeStyle = '#e9ecef';
+    ctx.stroke();
+    
+    // Value arc
+    const endAngle = Math.PI + (Math.PI * value / 100);
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, Math.PI, endAngle, false);
+    ctx.lineWidth = 15;
+    ctx.strokeStyle = color;
+    ctx.stroke();
+}
+
+function getColor(value, invert = false) {
+    const v = invert ? 100 - value : value;
+    if (v >= 70) return '#28a745';
+    if (v >= 40) return '#ffc107';
+    return '#dc3545';
+}
+
+function updateMetrics(metrics) {
+    if (!metrics) return;
+    
+    document.getElementById('frames-analyzed').textContent = metrics.frame_count || '-';
+    document.getElementById('faces-detected').textContent = metrics.faces_detected || '-';
+    document.getElementById('overall-score').textContent = (metrics.overall_forensics_score || 0).toFixed(1) + '%';
+    
+    // Update gauges
+    const face = metrics.face_consistency_score || 0;
+    const blink = metrics.eye_blink_score || 0;
+    const temporal = metrics.temporal_stability_score || 0;
+    const artifacts = metrics.compression_artifact_score || 0;
+    
+    document.getElementById('face-value').textContent = face.toFixed(1) + '%';
+    document.getElementById('blink-value').textContent = blink.toFixed(1) + '%';
+    document.getElementById('temporal-value').textContent = temporal.toFixed(1) + '%';
+    document.getElementById('artifacts-value').textContent = artifacts.toFixed(1) + '%';
+    
+    drawGauge('gauge-face', face, getColor(face));
+    drawGauge('gauge-blink', blink, getColor(blink));
+    drawGauge('gauge-temporal', temporal, getColor(temporal));
+    drawGauge('gauge-artifacts', artifacts, getColor(artifacts, true));
+    
+    // Update additional details
+    if (metrics.analysis_details) {
+        if (metrics.analysis_details.blink) {
+            document.getElementById('blink-rate').textContent = 
+                (metrics.analysis_details.blink.blinks_per_minute || 0).toFixed(1);
+        }
+        if (metrics.analysis_details.artifacts) {
+            document.getElementById('blockiness-value').textContent = 
+                (metrics.analysis_details.artifacts.mean_blockiness || 0).toFixed(3);
+        }
+    }
+    
+    // Update table
+    updateAnalysisTable(metrics);
+}
+
+function updateAnalysisTable(metrics) {
+    const tbody = document.getElementById('analysis-tbody');
+    const rows = [
+        ['Face Consistency', metrics.face_consistency_score, 
+         metrics.face_consistency_score > 60 ? 'Normal' : 'Suspicious', 
+         'Measures facial feature consistency'],
+        ['Eye Blink Score', metrics.eye_blink_score,
+         metrics.eye_blink_score > 40 ? 'Normal' : 'Abnormal',
+         'Natural blink pattern analysis'],
+        ['Temporal Stability', metrics.temporal_stability_score,
+         metrics.temporal_stability_score > 50 ? 'Stable' : 'Unstable',
+         'Frame-to-frame consistency'],
+        ['Compression Artifacts', metrics.compression_artifact_score,
+         metrics.compression_artifact_score < 50 ? 'Low' : 'High',
+         'Blocking and frequency anomalies'],
+        ['Overall Score', metrics.overall_forensics_score,
+         metrics.overall_forensics_score > 60 ? 'Likely Authentic' : 'Suspicious',
+         'Combined forensics assessment']
+    ];
+    
+    tbody.innerHTML = rows.map(row => {
+        const statusClass = row[2].includes('Normal') || row[2].includes('Stable') || 
+                           row[2].includes('Low') || row[2].includes('Authentic') 
+                           ? 'text-success' : 'text-danger';
+        return `<tr>
+            <td>${row[0]}</td>
+            <td>${row[1].toFixed(1)}%</td>
+            <td class="${statusClass}"><strong>${row[2]}</strong></td>
+            <td class="small text-muted">${row[3]}</td>
+        </tr>`;
+    }).join('');
+}
+
+function runForensics() {
+    if (!videoPath) {
+        alert('No video path available');
+        return;
+    }
+    
+    document.getElementById('forensics-summary').textContent = 'Running analysis...';
+    
+    fetch('{% url "ml_app:api_forensics" %}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({video_path: videoPath, max_frames: 100})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) throw new Error(data.error);
+        updateMetrics(data.metrics);
+        document.getElementById('forensics-summary').textContent = 
+            'Analysis complete. See detailed metrics below.';
+        document.getElementById('analysis-time').textContent = new Date().toLocaleString();
+    })
+    .catch(err => {
+        document.getElementById('forensics-summary').textContent = 'Error: ' + err.message;
+    });
+}
+
+function downloadReport() {
+    alert('Report download feature - generates PDF with all forensics data');
+}
+</script>
+
+<!-- Django data passed to JavaScript -->
+<script id="forensics-django-data" type="application/json">
+{
+    "metrics": {{ metrics|default:'null'|safe }},
+    "video_path": "{{ video_path|default:''|escapejs }}",
+    "has_metrics": {% if metrics %}true{% else %}false{% endif %},
+    "has_video": {% if video_path %}true{% else %}false{% endif %}
+}
+</script>
+
+<script>
+// Load on page ready
+document.addEventListener('DOMContentLoaded', function() {
+    var dataEl = document.getElementById('forensics-django-data');
+    var data = {};
+    try {
+        data = JSON.parse(dataEl.textContent);
+    } catch(e) {
+        console.error('Failed to parse Django data:', e);
+    }
+    
+    if (data.has_metrics && data.metrics) {
+        updateMetrics(data.metrics);
+        document.getElementById('forensics-summary').textContent = 'Analysis loaded from session.';
+        document.getElementById('analysis-time').textContent = new Date().toLocaleString();
+    } else if (data.has_video) {
+        runForensics();
+    }
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.metric-card {
+    height: 100%;
+}
+.metric-card .card-header {
+    background: #f8f9fa;
+    font-weight: bold;
+}
+.metric-gauge {
+    text-align: center;
+    margin-bottom: 15px;
+}
+.gauge-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-top: -30px;
+}
+.metric-details {
+    border-top: 1px solid #dee2e6;
+    padding-top: 10px;
+}
+.score-circle {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 20px auto;
+    color: white;
+    font-size: 2rem;
+    font-weight: bold;
+}
+.summary-box {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    white-space: pre-wrap;
+    min-height: 100px;
+}
+</style>
+{% endblock %}

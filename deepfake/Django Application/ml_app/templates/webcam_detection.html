@@ -1,0 +1,504 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Real-Time Webcam Detection{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12 text-center">
+            <h2 class="mb-4">
+                <i class="fas fa-video"></i> Real-Time Deepfake Detection
+            </h2>
+            <p class="text-muted">Live webcam-based deepfake detection demo</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Video Feed -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-camera"></i> Webcam Feed</span>
+                    <span id="fps-counter">FPS: --</span>
+                </div>
+                <div class="card-body p-0 position-relative">
+                    <video id="webcam" autoplay playsinline muted class="w-100"></video>
+                    <canvas id="overlay" class="position-absolute" style="top:0;left:0;pointer-events:none;"></canvas>
+                    
+                    <!-- Status Overlay -->
+                    <div id="status-overlay" class="status-overlay">
+                        <span id="status-text">Click Start to begin</span>
+                    </div>
+                    
+                    <!-- Warning Overlay -->
+                    <div id="warning-overlay" class="warning-overlay" style="display:none;">
+                        <h2>⚠️ POTENTIAL DEEPFAKE DETECTED ⚠️</h2>
+                        <p id="warning-probability">Fake Probability: --</p>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <button id="start-btn" class="btn btn-success btn-lg" onclick="startDetection()">
+                                <i class="fas fa-play"></i> Start Detection
+                            </button>
+                            <button id="stop-btn" class="btn btn-danger btn-lg" onclick="stopDetection()" style="display:none;">
+                                <i class="fas fa-stop"></i> Stop
+                            </button>
+                        </div>
+                        <div class="col-md-6 text-right">
+                            <span class="badge badge-secondary" id="frame-counter">Frames: 0</span>
+                            <span class="badge badge-info" id="inference-counter">Inferences: 0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detection Panel -->
+        <div class="col-lg-4">
+            <!-- Live Probability Meter -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-tachometer-alt"></i> Fake Probability Meter
+                </div>
+                <div class="card-body">
+                    <div class="probability-meter">
+                        <div class="meter-label">REAL</div>
+                        <div class="meter-bar-container">
+                            <div class="meter-bar" id="probability-bar"></div>
+                            <div class="threshold-line" style="left: 60%;"></div>
+                        </div>
+                        <div class="meter-label">FAKE</div>
+                    </div>
+                    <div class="text-center mt-3">
+                        <h3 id="current-prediction" class="text-muted">--</h3>
+                        <p id="current-confidence">Confidence: --</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detection History -->
+            <div class="card mb-3">
+                <div class="card-header bg-secondary text-white">
+                    <i class="fas fa-history"></i> Detection History
+                </div>
+                <div class="card-body" style="max-height: 200px; overflow-y: auto;">
+                    <ul id="history-list" class="list-unstyled mb-0">
+                        <li class="text-muted">No detections yet</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <i class="fas fa-cog"></i> Settings
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>Inference Interval (frames)</label>
+                        <input type="range" class="form-control-range" id="interval-slider" 
+                               min="5" max="30" value="{{ inference_interval }}">
+                        <small class="text-muted">Current: <span id="interval-value">{{ inference_interval }}</span></small>
+                    </div>
+                    <div class="form-group">
+                        <label>Fake Threshold</label>
+                        <input type="range" class="form-control-range" id="threshold-slider" 
+                               min="0.3" max="0.9" step="0.05" value="{{ fake_threshold }}">
+                        <small class="text-muted">Current: <span id="threshold-value">{{ fake_threshold }}</span></small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-chart-pie"></i> Session Statistics
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h4 id="fake-count">0</h4>
+                            <small class="text-danger">Fake Detections</small>
+                        </div>
+                        <div class="col-6">
+                            <h4 id="real-count">0</h4>
+                            <small class="text-success">Real Detections</small>
+                        </div>
+                    </div>
+                    <div class="text-center mt-2">
+                        <small>Avg Inference Time: <span id="avg-inference">--</span> ms</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h5><i class="fas fa-info-circle"></i> Instructions</h5>
+                <ul class="mb-0">
+                    <li>Click <strong>Start Detection</strong> to begin real-time analysis</li>
+                    <li>Position your face clearly in the camera view</li>
+                    <li>The system analyzes frames at the configured interval</li>
+                    <li>Red warning overlay appears when fake probability exceeds threshold</li>
+                    <li>Adjust settings in real-time to balance accuracy vs. performance</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js_scripts %}
+<!-- Django data passed to JavaScript -->
+<script id="webcam-django-data" type="application/json">
+{
+    "sequence_length": {{ sequence_length|default:20 }},
+    "inference_interval": {{ inference_interval|default:15 }},
+    "fake_threshold": {{ fake_threshold|default:0.6 }}
+}
+</script>
+
+<script>
+// Parse Django data
+var webcamDataEl = document.getElementById('webcam-django-data');
+var webcamConfig = {sequence_length: 20, inference_interval: 15, fake_threshold: 0.6};
+try {
+    webcamConfig = JSON.parse(webcamDataEl.textContent);
+} catch(e) {
+    console.error('Failed to parse webcam config:', e);
+}
+
+const SEQUENCE_LENGTH = webcamConfig.sequence_length;
+let stream = null;
+let isRunning = false;
+let frameCount = 0;
+let inferenceCount = 0;
+let frameBuffer = [];
+let lastInferenceTime = 0;
+let fakeCount = 0;
+let realCount = 0;
+let totalInferenceTime = 0;
+let animationId = null;
+
+// Settings
+let inferenceInterval = webcamConfig.inference_interval;
+let fakeThreshold = webcamConfig.fake_threshold;
+
+// DOM elements
+const video = document.getElementById('webcam');
+const overlay = document.getElementById('overlay');
+const overlayCtx = overlay.getContext('2d');
+
+// Settings sliders
+document.getElementById('interval-slider').addEventListener('input', function() {
+    inferenceInterval = parseInt(this.value);
+    document.getElementById('interval-value').textContent = this.value;
+});
+
+document.getElementById('threshold-slider').addEventListener('input', function() {
+    fakeThreshold = parseFloat(this.value);
+    document.getElementById('threshold-value').textContent = this.value;
+    document.querySelector('.threshold-line').style.left = (fakeThreshold * 100) + '%';
+});
+
+async function startDetection() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 640, height: 480, facingMode: 'user' }
+        });
+        
+        video.srcObject = stream;
+        await video.play();
+        
+        // Setup overlay
+        overlay.width = video.videoWidth || 640;
+        overlay.height = video.videoHeight || 480;
+        
+        isRunning = true;
+        frameCount = 0;
+        inferenceCount = 0;
+        frameBuffer = [];
+        
+        document.getElementById('start-btn').style.display = 'none';
+        document.getElementById('stop-btn').style.display = 'inline-block';
+        document.getElementById('status-overlay').style.display = 'none';
+        
+        processFrame();
+    } catch (err) {
+        alert('Error accessing webcam: ' + err.message);
+    }
+}
+
+function stopDetection() {
+    isRunning = false;
+    
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+    
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+    }
+    
+    document.getElementById('start-btn').style.display = 'inline-block';
+    document.getElementById('stop-btn').style.display = 'none';
+    document.getElementById('status-overlay').style.display = 'flex';
+    document.getElementById('status-text').textContent = 'Detection stopped';
+    document.getElementById('warning-overlay').style.display = 'none';
+}
+
+function processFrame() {
+    if (!isRunning) return;
+    
+    frameCount++;
+    document.getElementById('frame-counter').textContent = 'Frames: ' + frameCount;
+    
+    // Capture frame
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    
+    // Add to buffer
+    const frameData = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+    frameBuffer.push(frameData);
+    
+    // Keep buffer size manageable
+    if (frameBuffer.length > SEQUENCE_LENGTH * 2) {
+        frameBuffer = frameBuffer.slice(-SEQUENCE_LENGTH);
+    }
+    
+    // Run inference at interval
+    if (frameCount % inferenceInterval === 0 && frameBuffer.length >= SEQUENCE_LENGTH) {
+        runInference();
+    }
+    
+    // Update FPS
+    const now = performance.now();
+    if (lastInferenceTime) {
+        const fps = 1000 / (now - lastInferenceTime);
+        document.getElementById('fps-counter').textContent = 'FPS: ' + fps.toFixed(1);
+    }
+    lastInferenceTime = now;
+    
+    animationId = requestAnimationFrame(processFrame);
+}
+
+async function runInference() {
+    const startTime = performance.now();
+    
+    try {
+        const response = await fetch('{% url "ml_app:api_webcam_infer" %}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                frames: frameBuffer.slice(-SEQUENCE_LENGTH),
+                sequence_length: SEQUENCE_LENGTH
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            console.error('Inference error:', data.error);
+            return;
+        }
+        
+        inferenceCount++;
+        const inferenceTime = performance.now() - startTime;
+        totalInferenceTime += inferenceTime;
+        
+        // Update UI
+        updateDetectionUI(data, inferenceTime);
+        
+    } catch (err) {
+        console.error('Inference error:', err);
+    }
+}
+
+function updateDetectionUI(data, inferenceTime) {
+    document.getElementById('inference-counter').textContent = 'Inferences: ' + inferenceCount;
+    
+    // Update probability meter
+    const fakeProbPercent = data.fake_probability * 100;
+    const bar = document.getElementById('probability-bar');
+    bar.style.width = fakeProbPercent + '%';
+    bar.style.backgroundColor = fakeProbPercent > (fakeThreshold * 100) ? '#dc3545' : '#28a745';
+    
+    // Update prediction
+    const predElem = document.getElementById('current-prediction');
+    predElem.textContent = data.prediction;
+    predElem.className = data.prediction === 'FAKE' ? 'text-danger' : 'text-success';
+    document.getElementById('current-confidence').textContent = 
+        'Confidence: ' + data.confidence.toFixed(1) + '%';
+    
+    // Update statistics
+    if (data.prediction === 'FAKE') {
+        fakeCount++;
+        document.getElementById('fake-count').textContent = fakeCount;
+    } else {
+        realCount++;
+        document.getElementById('real-count').textContent = realCount;
+    }
+    
+    document.getElementById('avg-inference').textContent = 
+        (totalInferenceTime / inferenceCount).toFixed(1);
+    
+    // Warning overlay
+    const warning = document.getElementById('warning-overlay');
+    if (data.fake_probability > fakeThreshold) {
+        warning.style.display = 'flex';
+        document.getElementById('warning-probability').textContent = 
+            'Fake Probability: ' + (data.fake_probability * 100).toFixed(1) + '%';
+    } else {
+        warning.style.display = 'none';
+    }
+    
+    // Add to history
+    addToHistory(data, inferenceTime);
+    
+    // Draw overlay
+    drawOverlay(data);
+}
+
+function addToHistory(data, inferenceTime) {
+    const list = document.getElementById('history-list');
+    if (list.querySelector('.text-muted')) {
+        list.innerHTML = '';
+    }
+    
+    const li = document.createElement('li');
+    li.className = 'mb-1';
+    li.innerHTML = `
+        <span class="badge ${data.prediction === 'FAKE' ? 'badge-danger' : 'badge-success'}">
+            ${data.prediction}
+        </span>
+        <small>${data.confidence.toFixed(1)}% (${inferenceTime.toFixed(0)}ms)</small>
+    `;
+    
+    list.insertBefore(li, list.firstChild);
+    
+    // Keep history manageable
+    while (list.children.length > 10) {
+        list.removeChild(list.lastChild);
+    }
+}
+
+function drawOverlay(data) {
+    overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+    
+    // Draw status bar
+    overlayCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    overlayCtx.fillRect(0, 0, overlay.width, 40);
+    
+    overlayCtx.font = '16px Arial';
+    overlayCtx.fillStyle = data.prediction === 'FAKE' ? '#ff4444' : '#44ff44';
+    overlayCtx.fillText(
+        `${data.prediction} - ${data.confidence.toFixed(1)}%`,
+        10, 26
+    );
+    
+    overlayCtx.fillStyle = 'white';
+    overlayCtx.fillText(
+        `Fake: ${(data.fake_probability * 100).toFixed(1)}%`,
+        overlay.width - 120, 26
+    );
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+#webcam {
+    display: block;
+    max-width: 100%;
+}
+
+.status-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.warning-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    animation: pulse 0.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { background: rgba(255, 0, 0, 0.3); }
+    50% { background: rgba(255, 0, 0, 0.5); }
+}
+
+.probability-meter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.meter-label {
+    font-size: 0.8rem;
+    font-weight: bold;
+    width: 40px;
+}
+
+.meter-bar-container {
+    flex: 1;
+    height: 30px;
+    background: linear-gradient(to right, #28a745, #ffc107, #dc3545);
+    border-radius: 5px;
+    position: relative;
+    overflow: hidden;
+}
+
+.meter-bar {
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    position: absolute;
+    right: 0;
+    transition: width 0.3s;
+}
+
+.threshold-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: white;
+    box-shadow: 0 0 5px black;
+}
+</style>
+{% endblock %}

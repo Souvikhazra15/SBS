@@ -1,0 +1,210 @@
+body {
+    height: 100%;
+}
+.bg {
+    /* The image used */
+    background-image: url("/static/images/background1.png");
+  
+    -webkit-background-size: cover;
+    -moz-background-size: cover;
+    -o-background-size: cover;
+  
+    /* Center and scale the image nicely */
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+
+
+}
+
+section{
+    padding-top: 60px;
+}
+
+.width-300{
+    width: 300px;
+    margin: auto;
+    padding: 20px;
+    box-shadow: 0 0px 9px 2px #ccc;
+}
+
+.width-400{
+    width: 400px;
+    margin: auto;
+    padding: 20px;
+    margin-top: 80px;
+    margin-bottom: 150px;
+    box-shadow: 0 0px 9px 2px #ccc;
+}
+
+.width-500{
+    width: 500px;
+    margin: auto;
+    padding: 20px;
+    box-shadow: 0 0px 9px 2px #ccc;
+}
+
+#videos{
+    display: none;
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.preprocess {
+    padding-right: 20px;
+    padding-bottom: 50px;
+}
+
+#preprocessed_images {
+  white-space: nowrap;
+  width: auto;
+  height: 250px;
+  padding: 20px;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+#preprocessed_images::-webkit-scrollbar,
+#faces_images::-webkit-scrollbar,
+#heatmap_images::-webkit-scrollbar {
+    height: 8px;
+}
+
+#preprocessed_images::-webkit-scrollbar-track,
+#faces_images::-webkit-scrollbar-track,
+#heatmap_images::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 10px;
+}
+
+#preprocessed_images::-webkit-scrollbar-thumb,
+#faces_images::-webkit-scrollbar-thumb,
+#heatmap_images::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+}
+
+#faces_images {
+    white-space: nowrap;
+    width: auto;
+    height: 150px;
+    padding: 20px;
+    overflow-x: scroll;
+    overflow-y: hidden;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.faces {
+    padding-right: 20px;
+    padding-bottom: 50px;
+    transition: transform 0.3s ease;
+}
+
+.faces:hover {
+    transform: scale(1.05);
+}
+
+#heatmap_images{
+    white-space: nowrap;
+    width: auto;
+    height: 200px;
+    padding: 20px;
+    overflow-x: scroll;
+    overflow-y: hidden;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.heat-map {
+    padding-right: 20px;
+    padding-bottom: 50px;
+    transition: transform 0.3s ease;
+}
+
+.heat-map:hover {
+    transform: scale(1.05);
+}
+
+.result {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    margin: 40px auto;
+    animation: slideUp 0.8s ease-out;
+}
+
+.result h3 {
+    color: #333;
+    margin-bottom: 30px;
+    font-weight: 700;
+}
+
+.result h4 {
+    font-size: 32px;
+    font-weight: 700;
+    margin-top: 30px;
+}
+
+.alert {
+    border-radius: 15px;
+    border: none;
+    padding: 20px 30px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+}
+
+.alert-danger {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    color: white;
+}
+
+.container {
+    position: relative;
+    z-index: 1;
+}
+
+h3 {
+    color: #333;
+   ox-shadow: 0 0px 9px 2px #ccc;
+}
+
+#faces_images {
+    white-space: nowrap;
+    width: auto;
+    height: 150px;
+    padding: 20px;
+    overflow-x: scroll;
+    overflow-y: hidden;
+    box-shadow: 0 0px 9px 2px #ccc;
+}
+
+.faces {
+    padding-right: 20px;
+    padding-bottom: 50px;
+}
+
+#heatmap_images{
+    white-space: nowrap;
+    width: auto;
+    height: 200px;
+    padding: 20px;
+    overflow-x: scroll;
+    overflow-y: hidden;
+    box-shadow: 0 0px 9px 2px #ccc;
+    margin-bottom: 20px;
+}
+
+.heat-map {
+    padding-right: 20px;
+    padding-bottom: 50px

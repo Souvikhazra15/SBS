@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% load static %}
+{%block content%}
+{%if no_faces%}
+<div class="container">
+  <div class="logo text-center mb-3"><img src="{% static 'images/logo1.png'%}" alt="Logo" ></div>
+  <hr />
+  <div class="alert alert-danger">
+    No faces detected. Cannot process the video.
+  </div>
+</div>
+{%else%}
+<div class="container">
+  <div class="logo text-center mb-3"><img src="{% static 'images/logo1.png'%}" alt="Logo" ></div>
+  <hr />
+
+  <h3>Frames Split</h3>
+  <div id="preprocessed_images" class="col-12 mt-4 mb-2">
+    {% for each_image in preprocessed_images %}
+    <img src="{{MEDIA_URL}}{{each_image}}" class="preprocess" width=auto height="250" />
+    {%endfor%}
+  </div>
+
+
+  <h3>Face Cropped Frames</h3>
+  <div id="faces_images" class="col-12 mb-2">
+    {% for each_image in faces_cropped_images %}
+    <img src="{{MEDIA_URL}}{{each_image}}" class="faces" width=auto height="150" />
+    {%endfor%}
+  </div>
+
+  <div class="result text-center">
+    <h3>Play to see Result</h3>
+    <div id="video-wrapper" style="display:inline-block; position:relative;">
+      <video height="320" width="640" id="predict-media" controls>
+        <source src="{{MEDIA_URL}}{{original_video}}" type="video/mp4" codecs="avc1.4d002a" />
+      </video>
+    </div>
+    {%if output == "REAL" %}
+    <h4 class="mx-auto">Result: <span style="color:green">{{output}}</span>
+      <img src="{% static 'images/thumpup.png'%}" alt="real" height="100px" width=auto>
+      {%else%}
+      <h4 class="mx-auto">Result: <span style="color:red">{{output}}</span>
+        <img src="{% static 'images/thumpdown.png'%}" alt="fake" height="100px" width=auto >
+      {%endif%}
+  </div>
+
+{%endif%}
+{%endblock%}
+{%block js_cripts%}
+<script src="{%static 'js/face-api.min.js'%}"></script>
+<script>
+  $(document).ready(function () {
+    const video = document.getElementById("predict-media");
+
+    Promise.all([
+      faceapi.nets.ssdMobilenetv1.loadFromUri('/static/json'),
+      faceapi.nets.tinyFaceDetector.loadFromUri('/static/json')
+    ])
+
+    var detectionTimeout;
+    video.addEventListener("playing", () => {
+      let canvas = document.getElementById('face-canvas');
+      const wrapper = document.getElementById('video-wrapper');
+      if (!canvas) {
+        canvas = faceapi.createCanvasFromMedia(video);
+        canvas.id = 'face-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.zIndex = 10;
+        canvas.style.pointerEvents = 'none';
+        wrapper.append(canvas);
+      }
+      const displaySize = {
+        width: video.videoWidth || video.clientWidth,
+        height: video.videoHeight || video.clientHeight
+      };
+      canvas.width = displaySize.width;
+      canvas.height = displaySize.height;
+      canvas.style.width = video.clientWidth + 'px';
+      canvas.style.height = video.clientHeight + 'px';
+      canvas.style.top = video.offsetTop + 'px';
+      canvas.style.left = video.offsetLeft + 'px';
+      faceapi.matchDimensions(canvas, displaySize);
+
+      detectionTimeout = setInterval(async () => {
+        const detections = await faceapi.detectAllFaces(video);
+        const resizedDetections = faceapi.resizeResults(detections, displaySize);
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.width = displaySize.width;
+        canvas.height = displaySize.height;
+        canvas.style.top = video.offsetTop + 'px';
+        canvas.style.left = video.offsetLeft + 'px';
+
+        resizedDetections.forEach((det) => {
+          const resultLabel = '{{output}}';
+          const confidence = '{{confidence}}';
+          const drawOptions = { label: resultLabel.concat('  ', confidence , '%') };
+          if (resultLabel === 'REAL') {
+            drawOptions.boxColor = '#0f0';
+          } else if (resultLabel === 'FAKE') {
+            drawOptions.boxColor = '#f00';
+          }
+          const drawBox = new faceapi.draw.DrawBox(det.box, drawOptions);
+          drawBox.draw(canvas);
+        });
+      }, 100);
+    });
+
+    video.addEventListener("pause", () => {
+      clearTimeout(detectionTimeout);
+    });
+  });
+</script>
+{%endblock%}

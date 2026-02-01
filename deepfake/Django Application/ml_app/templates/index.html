@@ -1,0 +1,912 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<div class="hero-section">
+    <!-- Animated Background -->
+    <div class="hero-bg-animation">
+        <div class="floating-shape shape-1"></div>
+        <div class="floating-shape shape-2"></div>
+        <div class="floating-shape shape-3"></div>
+        <div class="grid-overlay"></div>
+    </div>
+
+    <div class="container">
+        <div class="row min-vh-100 align-items-center">
+            <!-- Left Column - Hero Content -->
+            <div class="col-lg-6 hero-content">
+                <div class="badge-pill mb-3">
+                    <span class="pulse-dot"></span>
+                    AI-Powered Detection
+                </div>
+                <h1 class="hero-title">
+                    <span class="gradient-text">Deepfake</span> Detection
+                    <span class="title-accent">System</span>
+                </h1>
+                <p class="hero-subtitle">
+                    Advanced neural network analysis to detect manipulated media with up to 
+                    <strong>97% accuracy</strong>. Trusted by forensics experts, newsrooms, and cybersecurity teams.
+                </p>
+                
+                <div class="trust-indicators">
+                    <div class="trust-item">
+                        <div class="trust-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                <path d="M9 12l2 2 4-4"/>
+                            </svg>
+                        </div>
+                        <span>Court-Ready Reports</span>
+                    </div>
+                    <div class="trust-item">
+                        <div class="trust-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 6v6l4 2"/>
+                            </svg>
+                        </div>
+                        <span>Real-Time Analysis</span>
+                    </div>
+                    <div class="trust-item">
+                        <div class="trust-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </div>
+                        <span>Explainable AI</span>
+                    </div>
+                </div>
+
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <span class="stat-number">97%</span>
+                        <span class="stat-label">Accuracy</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-number">100+</span>
+                        <span class="stat-label">Frames Analyzed</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-number">ResNeXt</span>
+                        <span class="stat-label">+ LSTM Model</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column - Upload Card -->
+            <div class="col-lg-6">
+                <div class="upload-card">
+                    <div class="card-glow"></div>
+                    <div class="upload-card-inner">
+                        <div class="upload-header">
+                            <div class="upload-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17,8 12,3 7,8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                            </div>
+                            <h3>Analyze Video</h3>
+                            <p>Upload a video file to detect potential deepfakes</p>
+                        </div>
+
+                        <!-- Video Preview -->
+                        <div class="video-preview-container" id="video-preview-container">
+                            <video width="100%" controls id="videos">
+                                <source src="" id="video_source">
+                                Your browser does not support HTML5 video.
+                            </video>
+                        </div>
+
+                        <form class="upload-form" method="POST" enctype="multipart/form-data" name="video-upload" id="video-upload">
+                            {% csrf_token %}
+                            
+                            <!-- File Upload Area -->
+                            <div class="file-upload-wrapper">
+                                <div class="file-upload-area" id="drop-zone">
+                                    <div class="upload-placeholder">
+                                        <div class="upload-icon-small">
+                                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                                <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/>
+                                                <path d="M12 12v9"/>
+                                                <path d="m8 17 4-5 4 5"/>
+                                            </svg>
+                                        </div>
+                                        <span class="upload-text">Drag & drop your video here</span>
+                                        <span class="upload-subtext">or click to browse</span>
+                                        <span class="upload-formats">MP4, AVI, MOV, MKV up to 100MB</span>
+                                    </div>
+                                    <div class="file-selected" style="display: none;">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                            <polyline points="22 4 12 14.01 9 11.01"/>
+                                        </svg>
+                                        <span class="file-name"></span>
+                                    </div>
+                                    {{ form.upload_video_file }}
+                                </div>
+                                {% if form.upload_video_file.errors %}
+                                {% for each_error in form.upload_video_file.errors %}
+                                <div class="error-message">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <line x1="15" y1="9" x2="9" y2="15"/>
+                                        <line x1="9" y1="9" x2="15" y2="15"/>
+                                    </svg>
+                                    {{ each_error }}
+                                </div>
+                                {% endfor %}
+                                {% endif %}
+                            </div>
+
+                            <!-- Frame Selector -->
+                            <div class="frame-selector">
+                                <div class="frame-header">
+                                    <label for="{{ form.sequence_length.id_for_label }}">Analysis Depth</label>
+                                    <span class="frame-value" id="slider-value">100</span>
+                                    <span class="frame-label">frames</span>
+                                </div>
+                                <input type="number" hidden="hidden" id="{{ form.sequence_length.id_for_label }}" name="{{ form.sequence_length.name }}">
+                                <div id="slider" class="custom-slider"></div>
+                                <div class="frame-presets">
+                                    <button type="button" class="preset-btn" data-value="0">
+                                        <span class="preset-frames">10</span>
+                                        <span class="preset-label">Quick</span>
+                                    </button>
+                                    <button type="button" class="preset-btn" data-value="1">
+                                        <span class="preset-frames">20</span>
+                                        <span class="preset-label">Fast</span>
+                                    </button>
+                                    <button type="button" class="preset-btn active" data-value="5">
+                                        <span class="preset-frames">100</span>
+                                        <span class="preset-label">Best</span>
+                                    </button>
+                                </div>
+                                <div class="accuracy-indicator">
+                                    <div class="accuracy-bar">
+                                        <div class="accuracy-fill" id="accuracy-fill"></div>
+                                    </div>
+                                    <span class="accuracy-text">Estimated accuracy: <strong id="accuracy-value">97%</strong></span>
+                                </div>
+                                {% if form.sequence_length.errors %}
+                                {% for each_error in form.sequence_length.errors %}
+                                <div class="error-message">{{ each_error }}</div>
+                                {% endfor %}
+                                {% endif %}
+                            </div>
+
+                            <!-- Submit Button -->
+                            <button id="videoUpload" type="submit" name="submit" class="submit-btn">
+                                <span class="btn-text">Analyze Video</span>
+                                <span class="btn-icon">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="5" y1="12" x2="19" y2="12"/>
+                                        <polyline points="12 5 19 12 12 19"/>
+                                    </svg>
+                                </span>
+                                <span class="btn-loader" style="display: none;">
+                                    <svg class="spinner" viewBox="0 0 24 24">
+                                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="31.4 31.4"/>
+                                    </svg>
+                                </span>
+                            </button>
+                        </form>
+
+                        <div class="upload-footer">
+                            <span>🔒 Your video is processed locally and never stored</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Hero Section */
+.hero-section {
+    min-height: 100vh;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #16213e 100%);
+}
+
+.hero-bg-animation {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    z-index: 0;
+}
+
+.floating-shape {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.4;
+    animation: float 20s ease-in-out infinite;
+}
+
+.shape-1 {
+    width: 400px;
+    height: 400px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    top: -100px;
+    right: -100px;
+    animation-delay: 0s;
+}
+
+.shape-2 {
+    width: 300px;
+    height: 300px;
+    background: linear-gradient(135deg, #f093fb, #f5576c);
+    bottom: -50px;
+    left: -50px;
+    animation-delay: -7s;
+}
+
+.shape-3 {
+    width: 200px;
+    height: 200px;
+    background: linear-gradient(135deg, #4facfe, #00f2fe);
+    top: 50%;
+    left: 30%;
+    animation-delay: -14s;
+}
+
+@keyframes float {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    25% { transform: translate(30px, -30px) rotate(5deg); }
+    50% { transform: translate(-20px, 20px) rotate(-5deg); }
+    75% { transform: translate(20px, 10px) rotate(3deg); }
+}
+
+.grid-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+}
+
+/* Hero Content */
+.hero-content {
+    position: relative;
+    z-index: 1;
+    padding: 40px 0;
+}
+
+.badge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(102, 126, 234, 0.15);
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: 50px;
+    color: #667eea;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    background: #667eea;
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+.hero-title {
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.1;
+    margin: 20px 0;
+}
+
+.gradient-text {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.title-accent {
+    display: block;
+    font-weight: 300;
+    opacity: 0.9;
+}
+
+.hero-subtitle {
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.7;
+    margin-bottom: 30px;
+    max-width: 500px;
+}
+
+.hero-subtitle strong {
+    color: #4facfe;
+}
+
+/* Trust Indicators */
+.trust-indicators {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.trust-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+}
+
+.trust-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    color: #667eea;
+}
+
+/* Hero Stats */
+.hero-stats {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+    padding: 25px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    backdrop-filter: blur(10px);
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-number {
+    display: block;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.stat-divider {
+    width: 1px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Upload Card */
+.upload-card {
+    position: relative;
+    z-index: 1;
+}
+
+.card-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    height: 80%;
+    background: radial-gradient(ellipse, rgba(102, 126, 234, 0.3), transparent 70%);
+    filter: blur(40px);
+    z-index: -1;
+}
+
+.upload-card-inner {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    padding: 40px;
+    backdrop-filter: blur(20px);
+}
+
+.upload-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.upload-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+    border-radius: 20px;
+    color: #667eea;
+}
+
+.upload-header h3 {
+    color: #fff;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.upload-header p {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.95rem;
+}
+
+/* Video Preview */
+.video-preview-container {
+    display: none;
+    margin-bottom: 20px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid rgba(102, 126, 234, 0.3);
+}
+
+.video-preview-container video {
+    display: block;
+}
+
+/* File Upload */
+.file-upload-wrapper {
+    margin-bottom: 25px;
+}
+
+.file-upload-area {
+    position: relative;
+    border: 2px dashed rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.file-upload-area:hover,
+.file-upload-area.dragover {
+    border-color: #667eea;
+    background: rgba(102, 126, 234, 0.05);
+}
+
+.file-upload-area input[type="file"] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.upload-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.upload-icon-small {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.upload-text {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.upload-subtext {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.9rem;
+}
+
+.upload-formats {
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 0.8rem;
+    margin-top: 5px;
+}
+
+.file-selected {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #4facfe;
+}
+
+.file-name {
+    font-weight: 500;
+}
+
+/* Frame Selector */
+.frame-selector {
+    margin-bottom: 25px;
+}
+
+.frame-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.frame-header label {
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 500;
+    flex: 1;
+}
+
+.frame-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #667eea;
+}
+
+.frame-label {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.9rem;
+}
+
+/* Custom Slider */
+.custom-slider {
+    margin-bottom: 20px;
+}
+
+.ui-slider {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 4px;
+}
+
+.ui-slider .ui-slider-range {
+    background: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+.ui-slider .ui-slider-handle {
+    width: 24px;
+    height: 24px;
+    top: -8px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: 3px solid #fff;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.ui-slider .ui-slider-handle:focus {
+    outline: none;
+}
+
+/* Frame Presets */
+.frame-presets {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.preset-btn {
+    flex: 1;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.preset-btn:hover {
+    background: rgba(102, 126, 234, 0.1);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.preset-btn.active {
+    background: rgba(102, 126, 234, 0.15);
+    border-color: #667eea;
+}
+
+.preset-frames {
+    display: block;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.preset-label {
+    display: block;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Accuracy Indicator */
+.accuracy-indicator {
+    padding: 15px;
+    background: rgba(79, 172, 254, 0.1);
+    border-radius: 12px;
+    border: 1px solid rgba(79, 172, 254, 0.2);
+}
+
+.accuracy-bar {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+
+.accuracy-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4facfe, #00f2fe);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+    width: 97%;
+}
+
+.accuracy-text {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.accuracy-text strong {
+    color: #4facfe;
+}
+
+/* Submit Button */
+.submit-btn {
+    width: 100%;
+    padding: 18px 30px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 14px;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.submit-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.submit-btn:hover::before {
+    left: 100%;
+}
+
+.submit-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+}
+
+.submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.spinner {
+    width: 24px;
+    height: 24px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Upload Footer */
+.upload-footer {
+    text-align: center;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.upload-footer span {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.85rem;
+}
+
+/* Error Message */
+.error-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 10px 15px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    color: #ef4444;
+    font-size: 0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 991px) {
+    .hero-title {
+        font-size: 2.5rem;
+    }
+    
+    .hero-content {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+    
+    .hero-subtitle {
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
+    .trust-indicators {
+        justify-content: center;
+    }
+    
+    .hero-stats {
+        justify-content: center;
+    }
+    
+    .upload-card-inner {
+        padding: 30px 20px;
+    }
+}
+
+@media (max-width: 576px) {
+    .hero-title {
+        font-size: 2rem;
+    }
+    
+    .hero-stats {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .stat-divider {
+        width: 40px;
+        height: 1px;
+    }
+    
+    .frame-presets {
+        flex-direction: column;
+    }
+}
+</style>
+{% endblock %}
+
+{% block js_cripts %}
+<script src="{% static 'js/script.js' %}"></script>
+<script>
+$(function () {
+    var sliderSequenceNumbers = [10, 20, 40, 60, 80, 100];
+    var accuracyMap = {10: 84, 20: 87, 40: 90, 60: 93, 80: 95, 100: 97};
+    
+    var slider = $("div#slider").slider({
+        value: 5,
+        min: 0,
+        max: sliderSequenceNumbers.length - 1,
+        range: "min",
+        slide: function (event, ui) {
+            var frames = sliderSequenceNumbers[ui.value];
+            $('#{{ form.sequence_length.id_for_label }}').val(frames);
+            $('#slider-value').html(frames);
+            updateAccuracy(frames);
+            updatePresetButtons(ui.value);
+        }
+    });
+    
+    var initialValue = sliderSequenceNumbers[$("#slider").slider("value")];
+    $("#{{ form.sequence_length.id_for_label }}").val(initialValue);
+    $('#slider-value').html(initialValue);
+    updateAccuracy(initialValue);
+    
+    function updateAccuracy(frames) {
+        var accuracy = accuracyMap[frames] || 90;
+        $('#accuracy-value').text(accuracy + '%');
+        $('#accuracy-fill').css('width', accuracy + '%');
+    }
+    
+    function updatePresetButtons(value) {
+        $('.preset-btn').removeClass('active');
+        $('.preset-btn[data-value="' + value + '"]').addClass('active');
+    }
+    
+    // Preset buttons
+    $('.preset-btn').on('click', function() {
+        var value = parseInt($(this).data('value'));
+        $("#slider").slider("value", value);
+        var frames = sliderSequenceNumbers[value];
+        $('#{{ form.sequence_length.id_for_label }}').val(frames);
+        $('#slider-value').html(frames);
+        updateAccuracy(frames);
+        updatePresetButtons(value);
+    });
+    
+    // File upload handling
+    var dropZone = document.getElementById('drop-zone');
+    var fileInput = dropZone.querySelector('input[type="file"]');
+    
+    ['dragenter', 'dragover'].forEach(function(eventName) {
+        dropZone.addEventListener(eventName, function(e) {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+    });
+    
+    ['dragleave', 'drop'].forEach(function(eventName) {
+        dropZone.addEventListener(eventName, function(e) {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        });
+    });
+    
+    fileInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            var fileName = this.files[0].name;
+            dropZone.querySelector('.upload-placeholder').style.display = 'none';
+            dropZone.querySelector('.file-selected').style.display = 'flex';
+            dropZone.querySelector('.file-name').textContent = fileName;
+            
+            // Show video preview
+            var video = document.getElementById('videos');
+            var source = document.getElementById('video_source');
+            source.src = URL.createObjectURL(this.files[0]);
+            video.load();
+            document.getElementById('video-preview-container').style.display = 'block';
+        }
+    });
+    
+    // Form submission
+    $('#video-upload').on('submit', function() {
+        var btn = $('#videoUpload');
+        btn.prop('disabled', true);
+        btn.find('.btn-text').text('Analyzing...');
+        btn.find('.btn-icon').hide();
+        btn.find('.btn-loader').show();
+    });
+});
+</script>
+{% endblock %}

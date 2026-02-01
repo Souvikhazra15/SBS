@@ -1,0 +1,51 @@
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Django
+*.py[cod]
+__pycache__/
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+*.pot
+local_settings.py
+db.sqlite3
+*.db
+
+# Media files (user uploads)
+Django\ Application/media/
+Django\ Application/uploaded_images/
+Django\ Application/uploaded_videos/
+
+# Models
+*.pt
+*.pth
+*.pkl
+*.h5
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
