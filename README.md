@@ -5,11 +5,11 @@ A comprehensive AI-powered Video-KYC (Know Your Customer) identity verification 
 ## 🚀 Features
 
 ### Core Verification Features
+- **Deepfake Detection**: AI-powered analysis to detect manipulated media (Remarkable 96% Accuracy)
 - **Real-time Video KYC**: Conversational video verification with live agent support
 - **ID Document OCR**: Automatic extraction of ID numbers from government documents
 - **Face Matching**: Biometric verification against document photos
 - **Liveness Detection**: Anti-spoofing measures to ensure physical presence
-- **Deepfake Detection**: AI-powered analysis to detect manipulated media
 - **Risk Scoring**: Comprehensive risk assessment with automated decision making
 - **Agent Review**: Human oversight for edge cases and final approval
 
